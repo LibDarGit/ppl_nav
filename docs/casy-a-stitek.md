@@ -22,6 +22,19 @@ a tytéž časy v UTC. Tlačítko **Nový let** časy smaže, potvrzuje se druh�
 
 Jakmile zapíšeš vzlet, počítá plán ETA od skutečného vzletu místo plánovaného odletu.
 
+## Mezipřistání
+
+Let po trase s přistáním na letištích po cestě se zapisuje po úsecích (odlet → přistání):
+
+- Po **Stání** na letišti, které není cílem trasy, nabídne tlačítko znovu **Pojíždění**: začne
+  další úsek z tohoto letiště. Po stání v cíli trasy let končí.
+- **Kde jsem přistál** pozná aplikace z GPS: bod trasy do 3 NM, jinak nejbližší letiště z databáze.
+  Bez GPS vezme další plánované mezipřistání, jinak cíl trasy. Opravíš to v Trasa › *Přistání na*.
+- **Plánovaná mezipřistání** označíš předem přes ✎ u bodu trasy (*Mezipřistání na tomto bodě*).
+  V plánu je u bodu značka „mezipřistání“.
+- **ETA** za mezipřistáním se počítá od vzletu z něj. Dokud ho nezapíšeš, zůstane prázdné.
+- V Trasa je každý úsek zvlášť (časy, blok, let, UTC), pod nimi součet bloku, letu a počet přistání.
+
 ## Navigační štítek A5
 
 **Trasa › Tisk štítku A5** otevře tisk (na iPadu přes AirPrint, nebo *Uložit do Souborů* jako PDF).
@@ -30,7 +43,10 @@ Na štítku je:
 - název trasy, délka, celkový čas, TAS, vítr, deklinace a čas odletu nebo vzletu,
 - tabulka bodů: magnetický kurz (MK), kurz s opravou na vítr (jen když je zadaný vítr), vzdálenost,
   GS, minuty úseku, součet, ETA a prázdný sloupec ATA pro ruční zápis,
-- políčka pro pojíždění, vzlet, přistání, stání a blokový čas (už zapsané časy jsou vyplněné),
+- u trasy s mezipřistáním je tabulka rozdělená na úseky, každý má vlastní součet času (Σ) a ETA od
+  svého vzletu,
+- políčka pro pojíždění, vzlet, přistání, stání a blok/let (blokový čas a čas letu) po úsecích
+  a jejich součet s počtem přistání; už zapsané časy jsou vyplněné,
 - prázdná políčka pro datum, letadlo, ATIS/QNH, RWY, palivo a poznámky.
 
 Na jednu stranu A5 se vejde zhruba 14 bodů. U delší trasy pokračuje tabulka na další straně
