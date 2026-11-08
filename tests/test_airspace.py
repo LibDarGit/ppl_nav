@@ -139,3 +139,19 @@ def test_layer_toggle_and_formatting(page):
     fmt = page.evaluate("""[__PPL.fmtLim({v:0,u:1,r:0}), __PPL.fmtLim({v:1000,u:1,r:0}),
                             __PPL.fmtLim({v:65,u:6,r:2}), __PPL.fmtLim({v:900,u:0,r:1})]""")
     assert fmt == ["GND", "1000 ft AGL", "FL65", "900 m MSL"]
+
+
+def test_national_park_low_overflight_is_restricted(page):
+    """openAIP vede LKR1–4 (národní parky, GND–1000 ft AGL) jako typ 29, v AIP jsou to omezené prostory R."""
+    park = {"_id": "lkr3", "name": "LKR3 KRNAP", "type": 29, "icaoClass": 8, "geometry": _poly(15.50, 50.44, 15.56, 50.49),
+            "lowerLimit": _lim(0, 1, 0), "upperLimit": _lim(1000, 1, 0)}
+    saved = ITEMS[:]
+    ITEMS[:] = [park]  # sám na trase, aby ho v pruhu nepřekryl CTR
+    try:
+        _download(page)
+    finally:
+        ITEMS[:] = saved
+    assert page.evaluate("__PPL.ASP.list.find(A => A.t === 29).n") == "LKR3 KRNAP"
+    page.evaluate(FLY_LEG_JS, [0, 1, 0.50, 6, 0, 100])  # 1500 ft, uvnitř: pod horní mezí (1000 ft AGL + rezerva)
+    txt = page.inner_text("#aspWarn")
+    assert txt.startswith("V prostoru R LKR3 KRNAP") and "GND – 1000 ft AGL" in txt
