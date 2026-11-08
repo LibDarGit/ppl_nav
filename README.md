@@ -9,11 +9,12 @@ Je to webová aplikace (PWA). Spouští se z ikony na ploše iPadu a funguje i o
 - automatické přepínání bodů, přímý let na bod (Direct To), hlasová upozornění česky
 - navigační plán s větrem: kurz s opravou na vítr, GS, časy úseků, ETA
 - podklad mapa ICAO 1:500 000 z vlastního souboru MBTiles (viz [docs/mapa-ICAO.md](docs/mapa-ICAO.md))
+- vzdušné prostory z openAIP s varováním před vstupem (viz [docs/vzdusne-prostory.md](docs/vzdusne-prostory.md))
 - pojmenování bodů (letiště, obce) a export trasy do GPX
 - volba jednotek NM/km a kt/km/h, simulace letu pro test na zemi
 
 > Pomocná navigační pomůcka. Není certifikovaná, nenahrazuje mapu ani plánování letu.
-> Nezobrazuje vzdušné prostory ani NOTAM.
+> Nezobrazuje NOTAM ani aktuální aktivaci prostorů (TRA/TSA, R/D) – ty ověř v AisView.
 
 ## Struktura
 
@@ -65,3 +66,4 @@ Pokud se nová verze neobjeví, zavři aplikaci a otevři ji znovu.
 - Seznam letišť: OurAirports (public domain)
 - Názvy obcí: Nominatim / OpenStreetMap
 - Mapa ICAO: © ŘLP ČR, s.p. – jen vlastní soubor uživatele, není součástí repozitáře
+- Vzdušné prostory: [openAIP](https://www.openaip.net) (CC BY-NC 4.0) – stahuje si je uživatel s vlastním API klíčem
