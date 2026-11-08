@@ -50,9 +50,9 @@ def test_wind_entry_by_tapping_recalculates(page):
     page.tap("#planSum")
     assert page.evaluate("[__PPL.S.cfg.wd, __PPL.S.cfg.ws]") == [270, 20]
     assert "1:19" in summary() and "270°/20" in summary()
-    page.tap("#pWs"); page.keyboard.press("Control+A"); page.keyboard.type("30")   # přepočet už při psaní
+    page.tap("#pWs"); page.keyboard.press("ControlOrMeta+A"); page.keyboard.type("30")   # přepočet už při psaní
     assert "1:24" in summary()
-    page.tap("#pWs"); page.keyboard.press("Control+A"); page.keyboard.press("Backspace"); page.tap("#planSum")
+    page.tap("#pWs"); page.keyboard.press("ControlOrMeta+A"); page.keyboard.press("Backspace"); page.tap("#planSum")
     assert "bez větru" in summary() and page.input_value("#pWd") == "270"
     page.reload()
     assert page.evaluate("__PPL.S.cfg.wd") == 270
