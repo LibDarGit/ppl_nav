@@ -1,0 +1,52 @@
+# Při každém pushi do main: spustí testy, a když projdou, nasadí app/ na GitHub Pages.
+# Do sw.js a index.html doplní verzi buildu → iPad pozná novou verzi a stáhne ji.
+name: Testy a nasazení na GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Instalace závislostí
+        run: |
+          pip install -r requirements-dev.txt
+          python -m playwright install --with-deps chromium
+      - name: Testy
+        run: pytest -q
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Doplnění verze buildu
+        run: |
+          V="$(date -u +%Y%m%d-%H%M)-${GITHUB_SHA::7}"
+          sed -i "s/__BUILD__/$V/g" app/sw.js app/index.html
+          echo "Verze: $V"
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: app
+      - id: deployment
+        uses: actions/deploy-pages@v4

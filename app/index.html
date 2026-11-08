@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="PPL Nav">
+<meta name="theme-color" content="#0b1220">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>PPL Nav</title>
+<style>
+:root{
+  --bg:#0b1220; --panel:#111a2e; --panel2:#18233d; --line:#26334f;
+  --txt:#e8eefc; --dim:#8b9bbd; --acc:#ff2fd0; --ok:#3ddc84; --warn:#ffb020; --bad:#ff4d4f;
+  --cyan:#36c9ff;
+  --sat:env(safe-area-inset-top); --sab:env(safe-area-inset-bottom);
+  --sal:env(safe-area-inset-left); --sar:env(safe-area-inset-right);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;overflow:hidden;overscroll-behavior:none}
+#app{position:fixed;inset:0;display:grid;grid-template-rows:auto 1fr auto;
+  padding:var(--sat) var(--sar) 0 var(--sal)}
+/* top nav strip */
+#strip{display:grid;grid-template-columns:1.6fr repeat(6,1fr);gap:1px;background:var(--line);border-bottom:1px solid var(--line)}
+.box{background:var(--panel);padding:6px 10px 7px;min-width:0}
+.box .k{font-size:11px;letter-spacing:.08em;color:var(--dim);text-transform:uppercase;white-space:nowrap}
+.box .v{font-size:30px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.box .v small{font-size:14px;font-weight:600;color:var(--dim);margin-left:2px}
+.box.wp .v{color:var(--acc)}
+.box .sub{font-size:12px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* map */
+#mapwrap{position:relative;overflow:hidden;overflow:clip;touch-action:none}
+canvas#map{position:absolute;inset:0;width:100%;height:100%;display:block}
+#banner{position:absolute;left:50%;top:10px;transform:translateX(-50%);max-width:92%;
+  padding:10px 18px;border-radius:12px;font-size:20px;font-weight:700;display:none;
+  box-shadow:0 6px 24px rgba(0,0,0,.4);text-align:center}
+#banner.info{display:block;background:var(--acc);color:#fff}
+#banner.warn{display:block;background:var(--warn);color:#111}
+#banner.bad{display:block;background:var(--bad);color:#fff}
+#banner.flash{animation:fl 1s steps(2,start) infinite}
+@keyframes fl{50%{opacity:.55}}
+.mbtns{position:absolute;right:10px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:10px}
+.mbtn{width:56px;height:56px;border-radius:14px;border:1px solid var(--line);background:rgba(17,26,46,.88);
+  color:var(--txt);font-size:24px;font-weight:700;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px)}
+.mbtn.on{background:var(--cyan);color:#06121f;border-color:var(--cyan)}
+.mbtn small{font-size:12px}
+#gpsinfo{position:absolute;left:10px;top:10px;font-size:13px;padding:6px 10px;border-radius:10px;background:rgba(17,26,46,.85);border:1px solid var(--line)}
+#gpsinfo i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;background:var(--bad);vertical-align:-1px}
+#gpsinfo.ok i{background:var(--ok)} #gpsinfo.weak i{background:var(--warn)}
+/* bottom */
+#bottom{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;background:var(--panel);
+  border-top:1px solid var(--line);padding:8px 12px calc(8px + var(--sab)) 12px}
+#cdiwrap{display:flex;align-items:center;gap:12px;min-width:0}
+canvas#cdi{height:54px;flex:1;min-width:0}
+#xte{font-size:22px;font-weight:700;min-width:130px;text-align:center;font-variant-numeric:tabular-nums}
+#xte small{display:block;font-size:12px;color:var(--dim);font-weight:500}
+.btns{display:flex;gap:8px}
+button.b{height:52px;padding:0 16px;border-radius:12px;border:1px solid var(--line);background:var(--panel2);
+  color:var(--txt);font-size:17px;font-weight:600}
+button.b:active,.mbtn:active{filter:brightness(1.35)}
+button.b.pri{background:var(--acc);border-color:var(--acc);color:#fff}
+/* drawers & modals */
+.drawer{position:absolute;top:0;right:0;bottom:0;width:min(480px,94vw);background:var(--panel);
+  border-left:1px solid var(--line);transform:translateX(105%);transition:transform .2s,visibility .2s;visibility:hidden;z-index:20;display:flex;flex-direction:column}
+.drawer.open{transform:none;visibility:visible}
+.drawer h3{margin:0;padding:14px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;font-size:18px}
+.drawer .body{overflow:auto;-webkit-overflow-scrolling:touch;flex:1;padding:0 0 20px}
+.leg{display:grid;grid-template-columns:1fr auto;gap:6px;padding:10px 16px;border-bottom:1px solid var(--line)}
+.leg.act{background:rgba(255,47,208,.14);box-shadow:inset 4px 0 0 var(--acc)}
+.leg.done{opacity:.45}
+.leg .n{font-size:18px;font-weight:700}
+.leg .d{font-size:13px;color:var(--dim);font-variant-numeric:tabular-nums}
+.leg .acts{display:flex;gap:6px;align-items:center}
+.leg button{height:40px;padding:0 12px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--txt);font-weight:600;font-size:15px}
+.leg button.dto{color:var(--acc);border-color:var(--acc)}
+.tot{padding:12px 16px;color:var(--dim);font-size:14px}
+.tot.sum{color:var(--txt);font-size:15px;border-bottom:1px solid var(--line)}
+.plan{display:flex;flex-wrap:wrap;gap:10px 16px;padding:12px 16px;border-bottom:1px solid var(--line);font-size:15px;color:var(--dim)}
+.plan label{display:flex;align-items:center;gap:6px}
+.plan input{font-size:17px;width:72px;padding:7px 8px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--txt);user-select:text;-webkit-user-select:text}
+.plan input[type=time]{width:110px}
+button.b.sm{height:38px;padding:0 10px;font-size:15px}
+.leg .d.t{color:var(--txt);opacity:.85}
+.row{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line);gap:12px;font-size:16px}
+.row select,.row input{font-size:16px;background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:8px;width:130px}
+.row input[type=checkbox]{width:26px;height:26px}
+.note{padding:12px 16px;color:var(--dim);font-size:13px;line-height:1.45}
+#start{position:fixed;inset:0;background:rgba(5,9,18,.94);z-index:50;display:flex;align-items:center;justify-content:center;padding:24px}
+#start .card{max-width:560px;width:100%;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:26px}
+#start h1{margin:0 0 6px;font-size:28px}
+#start p{color:var(--dim);line-height:1.5;margin:8px 0}
+#start .acts{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
+#start .warnbox{border:1px solid var(--warn);color:var(--warn);border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.45;margin-top:14px}
+#routeinfo{color:var(--txt)!important;font-weight:600}
+#nameDlg{position:fixed;inset:0;z-index:70;background:rgba(5,9,18,.8);display:none;align-items:flex-start;justify-content:center;padding:60px 16px}
+#nameDlg .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px;width:min(480px,94vw)}
+#nameDlg h4{margin:0 0 4px;font-size:18px} #nameDlg .c{color:var(--dim);font-size:13px;margin-bottom:12px}
+#nameIn{width:100%;font-size:22px;font-weight:700;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--txt);user-select:text;-webkit-user-select:text}
+#nameSug{display:flex;flex-direction:column;gap:6px;margin:12px 0}
+#nameSug button{text-align:left;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--txt);font-size:15px}
+#nameSug button small{color:var(--dim);margin-left:6px}
+.legtools{display:flex;gap:8px;padding:10px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.leg button.ed{font-size:18px;padding:0 10px}
+input[type=file]{display:none}
+@media (max-width:900px){
+  #strip{grid-template-columns:repeat(4,1fr)}
+  .box.wp{grid-column:span 4}
+  .box .v{font-size:24px}
+}
+@media (orientation:portrait) and (min-width:700px){ .box .v{font-size:26px} }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="strip">
+    <div class="box wp"><div class="k">Další bod</div><div class="v" id="vWp">—</div><div class="sub" id="vWpSub">&nbsp;</div></div>
+    <div class="box"><div class="k" id="kDtk">DTK °M</div><div class="v" id="vDtk">—</div></div>
+    <div class="box"><div class="k" id="kBrg">BRG °M</div><div class="v" id="vBrg">—</div></div>
+    <div class="box"><div class="k">DIST</div><div class="v" id="vDist">—</div></div>
+    <div class="box"><div class="k">ETE / ETA</div><div class="v" id="vEte">—</div></div>
+    <div class="box"><div class="k" id="kTrk">GS</div><div class="v" id="vGs">—</div><div class="sub" id="vTrk">&nbsp;</div></div>
+    <div class="box"><div class="k">ALT GPS</div><div class="v" id="vAlt">—</div><div class="sub" id="vRem">&nbsp;</div></div>
+  </div>
+
+  <div id="mapwrap">
+    <canvas id="map"></canvas>
+    <div id="gpsinfo"><i></i><span id="gpsTxt">GPS: čekám</span></div>
+    <div id="banner"></div>
+    <div class="mbtns">
+      <button class="mbtn" id="bZin">+</button>
+      <button class="mbtn" id="bZout">−</button>
+      <button class="mbtn on" id="bFollow" title="Sledovat polohu">◎</button>
+      <button class="mbtn on" id="bOrient"><small>TRK<br>UP</small></button>
+    </div>
+
+    <div class="drawer" id="dLegs">
+      <h3>Trasa <button class="b" data-close>Zavřít</button></h3>
+      <div class="body" id="legList"></div>
+    </div>
+    <div class="drawer" id="dSet">
+      <h3>Nastavení <button class="b" data-close>Zavřít</button></h3>
+      <div class="body">
+        <div class="row">Mapový podklad
+          <select id="sMap"><option value="icao">Mapa ICAO (vlastní)</option><option value="otm">OpenTopoMap</option><option value="osm">OpenStreetMap</option><option value="none">Bez podkladu</option></select></div>
+        <div class="row" style="flex-wrap:wrap"><div>Mapa ICAO 1:500 000<div class="d" id="chartInfo" style="font-size:13px;color:var(--dim)">nenahraná</div></div>
+          <div style="display:flex;gap:8px"><button class="b" id="bChart">Nahrát .mbtiles</button><button class="b" id="bChartDel">Smazat</button></div></div>
+        <div class="row">Okolí mimo mapu ICAO doplnit OpenTopoMap
+          <input id="sUnder" type="checkbox"></div>
+        <div class="row">Kurzy
+          <select id="sMag"><option value="1">Magnetické (°M)</option><option value="0">Zeměpisné (°T)</option></select></div>
+        <div class="row">Vzdálenost
+          <select id="sDu"><option value="nm">NM (námořní míle)</option><option value="km">km</option></select></div>
+        <div class="row">Rychlost
+          <select id="sSu"><option value="kt">kt (uzly)</option><option value="kmh">km/h</option></select></div>
+        <div class="row">Magnetická deklinace (°E)
+          <input id="sVar" type="number" step="0.1"></div>
+        <div class="row"><span>Přepnout bod při vzdálenosti (<span class="uD">NM</span>)</span>
+          <input id="sSeq" type="number" step="0.1" min="0.1"></div>
+        <div class="row"><span>Rozsah CDI (± <span class="uD">NM</span>)</span>
+          <input id="sCdi" type="number" step="0.5" min="0.5"></div>
+        <div class="row"><span>Plánovaná rychlost (<span class="uS">kt</span>)</span>
+          <input id="sTas" type="number" step="5" min="30"></div>
+        <div class="row">Hlasová upozornění
+          <input id="sVoice" type="checkbox"></div>
+        <div class="row">Noční režim mapy
+          <input id="sNight" type="checkbox"></div>
+        <div class="row">Simulace letu (test na zemi)
+          <input id="sSim" type="checkbox"></div>
+        <div class="row"><span>Rychlost simulace (<span class="uS">kt</span>)</span>
+          <input id="sSimKt" type="number" step="10" min="40"></div>
+        <div class="row"><button class="b" id="bLoad2">Nahrát jiný GPX</button><button class="b" id="bClearTrk">Smazat stopu</button></div>
+        <div class="note">Mapové dlaždice se ukládají do paměti iPadu jen v místech, která si na mapě prohlédneš.
+          Před letem si proto trasu na zemi s internetem projeď (posun/zoom podél trati), v letu pak mapa funguje i bez signálu.
+          Navigace (body, kurzy, vzdálenosti, CDI) funguje offline vždy.<br><br>
+          Mapa © přispěvatelé OpenStreetMap, styl OpenTopoMap (CC-BY-SA). Mapa ICAO © ŘLP ČR, s.p. – vlastní soubor uživatele. Seznam letišť: OurAirports (public domain). Názvy obcí: Nominatim / © OpenStreetMap.<br><br>
+          Pomocná navigační pomůcka, není certifikovaná. Nezobrazuje vzdušné prostory ani NOTAM.<br><br>Verze aplikace: <span id="appVer">__BUILD__</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="bottom">
+    <div id="cdiwrap">
+      <canvas id="cdi"></canvas>
+      <div id="xte">—<small>odchylka od trati</small></div>
+    </div>
+    <div class="btns">
+      <button class="b" id="bPrev">◀ Bod</button>
+      <button class="b" id="bNext">Bod ▶</button>
+      <button class="b pri" id="bLegs">Trasa</button>
+      <button class="b" id="bSet">⚙︎</button>
+    </div>
+  </div>
+</div>
+
+<div id="start">
+  <div class="card">
+    <h1>PPL Nav</h1>
+    <p>Navigace po trati z GPX souboru (SkyDemon / AISVIEW / jiný planner). Podporuje &lt;rtept&gt;, &lt;wpt&gt; i &lt;trkpt&gt;.</p>
+    <p id="routeinfo"></p>
+    <div class="acts">
+      <button class="b" id="bLoad">Nahrát GPX</button>
+      <button class="b pri" id="bGo">Spustit navigaci</button>
+    </div>
+    <div class="warnbox">Pomocná pomůcka pro VFR – nenahrazuje mapu, plánování ani certifikovanou navigaci.
+      iPad potřebuje GPS (verze s mobilními daty, nebo externí GPS přijímač). Během letu nech aplikaci na popředí.</div>
+  </div>
+</div>
+<input type="file" id="file" accept=".gpx,application/gpx+xml,application/xml,text/xml,*/*">
+<input type="file" id="chartFile">
+<div id="nameDlg"><div class="card">
+  <h4 id="nameTitle">Název bodu</h4><div class="c" id="nameCoord"></div>
+  <input id="nameIn" maxlength="28" autocomplete="off" autocapitalize="characters" spellcheck="false">
+  <div id="nameSug"></div>
+  <div id="spdRow" class="c" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px">Rychlost na úseku k tomuto bodu
+    <input id="legSpd" type="number" inputmode="decimal" style="width:80px;font-size:17px;padding:7px 8px;border-radius:8px;border:1px solid var(--line);background:var(--panel2);color:var(--txt)">
+    <span class="uS">kt</span> <span>(prázdné = výchozí)</span></div>
+  <div style="display:flex;gap:8px;justify-content:flex-end"><button class="b" id="nameCancel">Zrušit</button><button class="b pri" id="nameOk">Uložit</button></div>
+</div></div>
+<div id="prog" style="position:fixed;inset:0;z-index:60;background:rgba(5,9,18,.85);display:none;align-items:center;justify-content:center"><div class="card" style="background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:24px;width:min(420px,90vw)"><div id="progTxt" style="font-size:18px;font-weight:600;margin-bottom:12px">Importuji mapu…</div><div style="height:12px;background:var(--panel2);border-radius:6px;overflow:hidden"><div id="progBar" style="height:100%;width:0;background:var(--acc)"></div></div></div></div>
+
+<script>
+"use strict";
+/* ================= geo math (NM, degrees) ================= */
+const R_NM = 3440.065, D2R = Math.PI/180, R2D = 180/Math.PI;
+const norm360 = d => ((d % 360) + 360) % 360;
+function gDist(a,b){
+  const p1=a.lat*D2R,p2=b.lat*D2R,dp=p2-p1,dl=(b.lon-a.lon)*D2R;
+  const h=Math.sin(dp/2)**2+Math.cos(p1)*Math.cos(p2)*Math.sin(dl/2)**2;
+  return 2*R_NM*Math.asin(Math.min(1,Math.sqrt(h)));
+}
+function gBrg(a,b){
+  const p1=a.lat*D2R,p2=b.lat*D2R,dl=(b.lon-a.lon)*D2R;
+  const y=Math.sin(dl)*Math.cos(p2), x=Math.cos(p1)*Math.sin(p2)-Math.sin(p1)*Math.cos(p2)*Math.cos(dl);
+  return norm360(Math.atan2(y,x)*R2D);
+}
+function gDest(a,brg,d){
+  const dr=d/R_NM,t=brg*D2R,p1=a.lat*D2R,l1=a.lon*D2R;
+  const p2=Math.asin(Math.sin(p1)*Math.cos(dr)+Math.cos(p1)*Math.sin(dr)*Math.cos(t));
+  const l2=l1+Math.atan2(Math.sin(t)*Math.sin(dr)*Math.cos(p1),Math.cos(dr)-Math.sin(p1)*Math.sin(p2));
+  return {lat:p2*R2D,lon:((l2*R2D+540)%360)-180};
+}
+/* cross-track (+ = right of course) and signed along-track distance */
+function legGeom(from,to,p){
+  const d13=gDist(from,p)/R_NM, t13=gBrg(from,p)*D2R, t12=gBrg(from,to)*D2R;
+  const xt=Math.asin(Math.max(-1,Math.min(1,Math.sin(d13)*Math.sin(t13-t12))));
+  let at=Math.acos(Math.max(-1,Math.min(1,Math.cos(d13)/Math.cos(xt))));
+  if (Math.cos(t13-t12)<0) at=-at;
+  return {xte:xt*R_NM, ate:at*R_NM, len:gDist(from,to)};
+}
+function angDiff(a,b){ return ((b-a+540)%360)-180; } // signed b-a in (-180,180]
+
+/* ================= state ================= */
+const LS = {
+  get(k,d){ try{const v=localStorage.getItem('pplnav.'+k); return v==null?d:JSON.parse(v);}catch(e){return d;} },
+  set(k,v){ try{localStorage.setItem('pplnav.'+k,JSON.stringify(v));}catch(e){} }
+};
+const S = {
+  route: LS.get('route', null),          // {name, pts:[{name,lat,lon}]}
+  active: LS.get('active', 1),           // index of TO waypoint
+  directFrom: LS.get('directFrom', null),
+  pos: null, gs: null, trk: null, alt: null, acc: null, fixTime: 0,
+  hist: [], lastRaw: null,
+  view: { lat: 50.5, lon: 15.6, z: 10, rot: 0 },
+  follow: true,
+  cfg: Object.assign({ map:'otm', underlay:true, du:'nm', su:'kt', orient:'trk', wd:0, wdSet:false, ws:0, dep:'', mag:true, variation:5.3, seq:0.5, cdi:2, tas:90, voice:true, night:false, sim:false, simKt:100 }, LS.get('cfg',{})),
+  announced: {}, started: false
+};
+const saveNav = () => { LS.set('active',S.active); LS.set('directFrom',S.directFrom); };
+
+/* ================= GPX ================= */
+function parseGPX(text){
+  const doc=new DOMParser().parseFromString(text,'application/xml');
+  if (doc.getElementsByTagName('parsererror').length) throw new Error('Soubor není platné GPX/XML.');
+  const pick = tag => Array.from(doc.getElementsByTagNameNS('*',tag));
+  let nodes = pick('rtept'); let kind='route';
+  if (nodes.length<2){ nodes=pick('wpt'); kind='waypoints'; }
+  if (nodes.length<2){ nodes=pick('trkpt'); kind='track'; }
+  if (nodes.length<2) throw new Error('V GPX nejsou alespoň 2 body trasy.');
+  let pts = nodes.map((n,i)=>{
+    const nm = n.getElementsByTagNameNS('*','name')[0];
+    return { name:(nm&&nm.textContent.trim())||('WP'+String(i+1).padStart(2,'0')),
+             lat:parseFloat(n.getAttribute('lat')), lon:parseFloat(n.getAttribute('lon')) };
+  }).filter(p=>isFinite(p.lat)&&isFinite(p.lon));
+  if (kind==='track' && pts.length>60){ // thin a recorded track to turn points ~ every 3 NM
+    const out=[pts[0]]; for (const p of pts){ if (gDist(out[out.length-1],p)>=3) out.push(p); }
+    if (out[out.length-1]!==pts[pts.length-1]) out.push(pts[pts.length-1]);
+    pts=out.map((p,i)=>({...p,name:'TP'+String(i+1).padStart(2,'0')}));
+  }
+  const rn = doc.getElementsByTagNameNS('*','name')[0];
+  return { name:(rn&&rn.textContent.trim())||'Trasa', pts };
+}
+function setRoute(r){
+  S.route=r; S.active=1; S.directFrom=null; S.announced={}; $('legList').innerHTML='';
+  LS.set('route',r); saveNav();
+  fitRoute(); renderLegs(); updateStartInfo(); requestRender(); updateNav();
+}
+function fitRoute(){
+  if(!S.route) return;
+  const pts=S.route.pts; let a=90,b=-90,c=180,d=-180;
+  for(const p of pts){a=Math.min(a,p.lat);b=Math.max(b,p.lat);c=Math.min(c,p.lon);d=Math.max(d,p.lon);}
+  S.view.lat=(a+b)/2; S.view.lon=(c+d)/2;
+  const W=mapCv.clientWidth||1000,H=mapCv.clientHeight||700;
+  for(let z=14;z>=4;z-=0.25){ const p1=proj(b,c,z),p2=proj(a,d,z); if(Math.abs(p2.x-p1.x)<W*0.8&&Math.abs(p2.y-p1.y)<H*0.8){S.view.z=z;break;} }
+}
+
+/* ================= mercator ================= */
+function proj(lat,lon,z){ const s=256*2**z, sl=Math.sin(lat*D2R);
+  return { x:(lon+180)/360*s, y:(0.5-Math.log((1+sl)/(1-sl))/(4*Math.PI))*s }; }
+function unproj(x,y,z){ const s=256*2**z, n=Math.PI-2*Math.PI*y/s;
+  return { lat:Math.atan(Math.sinh(n))*R2D, lon:x/s*360-180 }; }
+
+/* ================= map rendering ================= */
+const mapCv=document.getElementById('map'), mctx=mapCv.getContext('2d');
+const cdiCv=document.getElementById('cdi'), cctx=cdiCv.getContext('2d');
+let DPR=1, MW=0, MH=0;
+function resize(){
+  DPR=Math.min(window.devicePixelRatio||1,2);
+  MW=mapCv.clientWidth; MH=mapCv.clientHeight;
+  mapCv.width=MW*DPR; mapCv.height=MH*DPR;
+  cdiCv.width=cdiCv.clientWidth*DPR; cdiCv.height=cdiCv.clientHeight*DPR;
+  requestRender(); drawCDI();
+}
+const TILE_SRC = {
+  osm: (z,x,y)=>`https://tile.openstreetmap.org/${z}/${x}/${y}.png`,
+  otm: (z,x,y)=>`https://${'abc'[(x+y)%3]}.tile.opentopomap.org/${z}/${x}/${y}.png`
+};
+const tileCache=new Map();
+function getTile(src,z,x,y){
+  const key=src+'/'+z+'/'+x+'/'+y; let t=tileCache.get(key);
+  if(t) return t;
+  const img=new Image(); t={img,ok:false,err:false,url:null}; tileCache.set(key,t);
+  img.onload=()=>{t.ok=true;requestRender();}; img.onerror=()=>{t.err=true;};
+  if (src==='icao'){
+    chartGet(z+'/'+x+'/'+y).then(b=>{ if(!b){t.err=true;return;} t.url=URL.createObjectURL(b); img.src=t.url; }).catch(()=>{t.err=true;});
+  } else img.src=TILE_SRC[src](z,x,y);
+  if(tileCache.size>700){ const k=tileCache.keys().next().value; const o=tileCache.get(k); if(o&&o.url) URL.revokeObjectURL(o.url); tileCache.delete(k); }
+  return t;
+}
+function drawTileLayer(ctx,a,src,minZ,maxZ){
+  const tz=Math.max(minZ,Math.min(maxZ,Math.round(S.view.z))), sc=2**(S.view.z-tz);
+  if (sc<0.24) return; // too far zoomed out for this layer
+  const c=proj(S.view.lat,S.view.lon,tz), rad=Math.hypot(MW,MH)/sc;
+  const n=2**tz, x0=Math.floor((c.x-rad)/256), x1=Math.floor((c.x+rad)/256),
+        y0=Math.max(0,Math.floor((c.y-rad)/256)), y1=Math.min(n-1,Math.floor((c.y+rad)/256));
+  ctx.save(); ctx.translate(a.x,a.y); ctx.rotate(-S.view.rot*D2R); ctx.scale(sc,sc); ctx.translate(-c.x,-c.y);
+  for(let ty=y0;ty<=y1;ty++) for(let tx=x0;tx<=x1;tx++){
+    const wx=((tx%n)+n)%n;
+    if (src==='icao' && CHART.meta && !chartCovers(tz,wx,ty)) continue;
+    const t=getTile(src,tz,wx,ty);
+    if(t.ok) ctx.drawImage(t.img,tx*256,ty*256,256.6,256.6);
+  }
+  ctx.restore();
+}
+function anchor(){ return { x:MW/2, y:(S.follow&&S.cfg.orient!=='north'&&S.pos)? MH*0.68 : MH/2 }; }
+// cílová orientace mapy: sever / traťový úhel z GPS / kurz plánované trati
+function orientTarget(){
+  const o=S.cfg.orient;
+  if (o==='north') return 0;
+  if (o==='dtk' && S.route && S.route.pts[S.active]) return gBrg(legFrom(), S.route.pts[S.active]);
+  if (S.trk!=null && (S.gs||0)>=10) return S.trk;
+  return null;                       // stojím / bez GPS: nech mapu natočenou jak je
+}
+function toScreen(lat,lon){
+  const z=S.view.z, c=proj(S.view.lat,S.view.lon,z), p=proj(lat,lon,z), a=anchor();
+  const dx=p.x-c.x, dy=p.y-c.y, r=-S.view.rot*D2R, cs=Math.cos(r), sn=Math.sin(r);
+  return { x:a.x+dx*cs-dy*sn, y:a.y+dx*sn+dy*cs };
+}
+let renderPending=false;
+function requestRender(){ if(!renderPending){renderPending=true;requestAnimationFrame(render);} }
+function render(){
+  renderPending=false;
+  const ctx=mctx; ctx.setTransform(DPR,0,0,DPR,0,0);
+  const night=S.cfg.night;
+  ctx.fillStyle=night?'#0d1424':'#dfe6ee'; ctx.fillRect(0,0,MW,MH);
+  if (S.follow && S.pos){ S.view.lat=S.pos.lat; S.view.lon=S.pos.lon; }
+  let rotAnim=false; { const tgt=orientTarget();
+    if (tgt!=null){ const d=angDiff(S.view.rot,tgt);
+      if (Math.abs(d)<0.3) S.view.rot=tgt; else { S.view.rot=norm360(S.view.rot+d*0.22); rotAnim=true; } } }
+  const a=anchor();
+  // tiles
+  if (S.cfg.map==='icao'){
+    if (S.cfg.underlay) drawTileLayer(ctx,a,'otm',3,17);
+    if (CHART.meta) drawTileLayer(ctx,a,'icao',CHART.meta.minz,CHART.meta.maxz);
+    if(night){ ctx.fillStyle='rgba(5,10,25,.55)'; ctx.fillRect(0,0,MW,MH); }
+  } else if (S.cfg.map!=='none'){
+    drawTileLayer(ctx,a,S.cfg.map,3,17);
+    if(night){ ctx.fillStyle='rgba(5,10,25,.62)'; ctx.fillRect(0,0,MW,MH); }
+    else { ctx.fillStyle='rgba(255,255,255,.12)'; ctx.fillRect(0,0,MW,MH); }
+  }
+  // breadcrumb
+  if (S.hist.length>1){
+    ctx.beginPath(); S.hist.forEach((p,i)=>{const s=toScreen(p.lat,p.lon); i?ctx.lineTo(s.x,s.y):ctx.moveTo(s.x,s.y);});
+    ctx.strokeStyle=night?'rgba(54,201,255,.8)':'rgba(0,90,200,.75)'; ctx.lineWidth=3; ctx.setLineDash([2,6]); ctx.lineCap='round'; ctx.stroke(); ctx.setLineDash([]);
+  }
+  // route
+  if (S.route){
+    const pts=S.route.pts, sp=pts.map(p=>toScreen(p.lat,p.lon));
+    // casing + line
+    for(let i=1;i<sp.length;i++){
+      const act=(i===S.active && !S.directFrom), done=i<S.active;
+      ctx.beginPath(); ctx.moveTo(sp[i-1].x,sp[i-1].y); ctx.lineTo(sp[i].x,sp[i].y);
+      ctx.strokeStyle='rgba(255,255,255,.9)'; ctx.lineWidth=act?10:7; ctx.stroke();
+      ctx.strokeStyle=done?'rgba(160,60,140,.55)':'#e000b4'; ctx.lineWidth=act?6:4; ctx.stroke();
+    }
+    // direct-to line
+    if (S.directFrom && S.route.pts[S.active]){
+      const f=toScreen(S.directFrom.lat,S.directFrom.lon), t=sp[S.active];
+      ctx.beginPath(); ctx.moveTo(f.x,f.y); ctx.lineTo(t.x,t.y);
+      ctx.strokeStyle='#fff'; ctx.lineWidth=10; ctx.stroke(); ctx.strokeStyle='#e000b4'; ctx.lineWidth=6; ctx.stroke();
+    }
+    // leg labels
+    ctx.font='600 14px -apple-system,Segoe UI,sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    for(let i=1;i<pts.length;i++){
+      const m={x:(sp[i-1].x+sp[i].x)/2,y:(sp[i-1].y+sp[i].y)/2};
+      if (Math.hypot(sp[i].x-sp[i-1].x,sp[i].y-sp[i-1].y)<140) continue;
+      const txt=`${fmtCrs(gBrg(pts[i-1],pts[i]))}  ${fD(gDist(pts[i-1],pts[i]),1)} ${dU()}`;
+      const w=ctx.measureText(txt).width+14;
+      ctx.fillStyle='rgba(255,255,255,.92)'; roundRect(ctx,m.x-w/2,m.y-12,w,24,7); ctx.fill();
+      ctx.strokeStyle='#e000b4'; ctx.lineWidth=1.5; ctx.stroke();
+      ctx.fillStyle='#5a0049'; ctx.fillText(txt,m.x,m.y+1);
+    }
+    // waypoints
+    pts.forEach((p,i)=>{
+      const s=sp[i], act=i===S.active;
+      ctx.beginPath(); ctx.arc(s.x,s.y,act?11:8,0,7);
+      ctx.fillStyle=act?'#e000b4':'#fff'; ctx.fill(); ctx.lineWidth=3; ctx.strokeStyle=act?'#fff':'#e000b4'; ctx.stroke();
+      ctx.font='700 16px -apple-system,Segoe UI,sans-serif'; ctx.textAlign='left';
+      ctx.lineWidth=4; ctx.strokeStyle=night?'#0b1220':'#fff'; ctx.strokeText(p.name,s.x+14,s.y-12);
+      ctx.fillStyle=night?'#ffd6f5':'#3b0030'; ctx.fillText(p.name,s.x+14,s.y-12);
+    });
+  }
+  // own aircraft + track vector
+  if (S.pos){
+    const s=toScreen(S.pos.lat,S.pos.lon);
+    if (S.trk!=null && S.gs>15){
+      const per=S.gs/60; // NM per minute
+      const e=gDest(S.pos,S.trk,per*5), es=toScreen(e.lat,e.lon);
+      ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(es.x,es.y);
+      ctx.strokeStyle=night?'#36c9ff':'#0050c8'; ctx.lineWidth=3; ctx.stroke();
+      for(let m=1;m<=5;m++){ const q=toScreen(...Object.values(gDest(S.pos,S.trk,per*m)));
+        ctx.beginPath(); ctx.arc(q.x,q.y,m===5?5:3.5,0,7); ctx.fillStyle=ctx.strokeStyle; ctx.fill(); }
+    }
+    if (S.acc && S.acc>50){ // accuracy circle
+      const pxPerNM = 256*2**S.view.z/(2*Math.PI*R_NM*Math.cos(S.pos.lat*D2R));
+      ctx.beginPath(); ctx.arc(s.x,s.y,S.acc/1852*pxPerNM,0,7); ctx.fillStyle='rgba(0,120,255,.12)'; ctx.fill();
+    }
+    ctx.save(); ctx.translate(s.x,s.y); ctx.rotate(((S.trk||0)-S.view.rot)*D2R);
+    ctx.beginPath(); // plane symbol
+    ctx.moveTo(0,-20); ctx.lineTo(3,-8); ctx.lineTo(18,0); ctx.lineTo(18,4); ctx.lineTo(3,1); ctx.lineTo(2,12);
+    ctx.lineTo(7,16); ctx.lineTo(7,19); ctx.lineTo(0,17); ctx.lineTo(-7,19); ctx.lineTo(-7,16); ctx.lineTo(-2,12);
+    ctx.lineTo(-3,1); ctx.lineTo(-18,4); ctx.lineTo(-18,0); ctx.lineTo(-3,-8); ctx.closePath();
+    ctx.fillStyle='#111'; ctx.strokeStyle='#ffe600'; ctx.lineWidth=2.5; ctx.stroke(); ctx.fill();
+    ctx.restore();
+  }
+  // north arrow
+  ctx.save(); ctx.translate(36,MH-40); ctx.rotate(-S.view.rot*D2R);
+  ctx.beginPath(); ctx.moveTo(0,-18); ctx.lineTo(8,8); ctx.lineTo(0,3); ctx.lineTo(-8,8); ctx.closePath();
+  ctx.fillStyle='#ff3b30'; ctx.fill(); ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
+  ctx.rotate(S.view.rot*D2R); ctx.fillStyle=night?'#fff':'#111'; ctx.font='700 12px sans-serif'; ctx.textAlign='center'; ctx.fillText('N',0,30);
+  ctx.restore();
+  // scale bar
+  const nmPx = 256*2**S.view.z/(2*Math.PI*R_NM*Math.cos(S.view.lat*D2R));
+  const uPx=nmPx/(isKm()?KM:1), steps=[0.5,1,2,5,10,20,50,100]; let nm=steps.find(v=>v*uPx>=90)||100;
+  const L=nm*uPx, x0=70, y0=MH-22;
+  ctx.strokeStyle=night?'#fff':'#111'; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(x0,y0-6); ctx.lineTo(x0,y0); ctx.lineTo(x0+L,y0); ctx.lineTo(x0+L,y0-6); ctx.stroke();
+  ctx.fillStyle=ctx.strokeStyle; ctx.font='600 13px sans-serif'; ctx.textAlign='center'; ctx.fillText(nm+' '+dU(),x0+L/2,y0-10);
+  if (rotAnim) requestRender();
+}
+function roundRect(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath();}
+
+/* ================= CDI ================= */
+let lastXte=null;
+function drawCDI(){
+  const c=cctx, W=cdiCv.width/DPR, H=cdiCv.height/DPR; c.setTransform(DPR,0,0,DPR,0,0); c.clearRect(0,0,W,H);
+  const mid=W/2, half=W/2-24, sc=S.cfg.cdi;
+  c.strokeStyle='#26334f'; c.lineWidth=2; c.beginPath(); c.moveTo(12,H/2); c.lineTo(W-12,H/2); c.stroke();
+  for(let i=-5;i<=5;i++){ if(!i) continue; const x=mid+i/5*half; c.beginPath(); c.arc(x,H/2,i%5?3.5:5,0,7); c.fillStyle='#8b9bbd'; c.fill(); }
+  c.fillStyle='#e8eefc'; c.beginPath(); c.moveTo(mid,H/2-14); c.lineTo(mid+8,H/2); c.lineTo(mid,H/2+14); c.lineTo(mid-8,H/2); c.closePath(); c.fill();
+  if (lastXte==null) return;
+  // needle shows where the COURSE is relative to us: course right -> needle right
+  const off=Math.max(-1,Math.min(1,-lastXte/sc)), x=mid+off*half;
+  const col=Math.abs(lastXte)>sc?'#ff4d4f':Math.abs(lastXte)>sc/2?'#ffb020':'#ff2fd0';
+  c.fillStyle=col; roundRect(c,x-5,4,10,H-8,4); c.fill();
+}
+
+/* ================= navigation logic ================= */
+const KM=1.852;
+const isKm=()=>S.cfg.du==='km', isKmh=()=>S.cfg.su==='kmh';
+const dU=()=>isKm()?'km':'NM', sU=()=>isKmh()?'km/h':'kt';
+const dV=nm=>isKm()?nm*KM:nm, sV=kt=>isKmh()?kt*KM:kt, fromS=v=>v/(isKmh()?KM:1);
+const fD=(nm,dec)=>{ const v=dV(nm); return dec!=null? v.toFixed(dec) : (v<10? v.toFixed(1) : String(Math.round(v))); };
+const fmtCrs = t => { const v=S.cfg.mag? norm360(t - S.cfg.variation) : t; return String(Math.round(v)%360||360).padStart(3,'0')+'°'; };
+const fmtTime = min => { if(!isFinite(min)||min<0) return '—'; const m=Math.round(min*60)/60; const h=Math.floor(m/60), mm=Math.floor(m%60), ss=Math.round((m*60)%60);
+  return h? `${h}:${String(mm).padStart(2,'0')}` : `${mm}:${String(ss).padStart(2,'0')}`; };
+const fmtClock = d => d.toLocaleTimeString('cs-CZ',{hour:'2-digit',minute:'2-digit'});
+const $=id=>document.getElementById(id);
+function legFrom(){ return S.directFrom || S.route.pts[S.active-1]; }
+
+function resetBanner(){ clearTimeout(bannerTimer); bannerTimer=null; bannerSticky=false; $('banner').className=''; }
+function sequence(dir){
+  if(!S.route) return; resetBanner();
+  const n=S.route.pts.length;
+  S.active=Math.max(1,Math.min(n-1,S.active+dir)); S.directFrom=null; S.announced={};
+  saveNav(); renderLegs(); updateNav(); requestRender();
+}
+function directTo(i){
+  if(!S.route) return; resetBanner();
+  if (S.pos){ S.directFrom={lat:S.pos.lat,lon:S.pos.lon}; S.active=i; }
+  else { S.directFrom=null; S.active=Math.max(1,i); }
+  S.announced={}; saveNav(); renderLegs(); updateNav(); requestRender();
+  showBanner(`Direct → ${S.route.pts[i].name}`,'info',4000);
+  speak(`Přímo na ${spoken(S.route.pts[i].name)}`);
+}
+function activateLeg(i){ resetBanner(); S.active=Math.max(1,i); S.directFrom=null; S.announced={}; saveNav(); renderLegs(); updateNav(); requestRender(); }
+
+function updateNav(){
+  const set=(id,h)=>{$(id).innerHTML=h;};
+  $('kDtk').textContent='DTK '+(S.cfg.mag?'°M':'°T'); $('kBrg').textContent='BRG '+(S.cfg.mag?'°M':'°T');
+  $('kTrk').textContent='GS';
+  // GS/TRK/ALT
+  set('vGs', S.gs!=null? `${Math.round(sV(S.gs))}<small>${sU()}</small>` : '—');
+  $('vTrk').textContent = (S.trk!=null&&S.gs>5)? `TRK ${fmtCrs(S.trk)}${S.cfg.mag?'M':'T'}` : '\u00a0';
+  if(!S.route){ set('vWp','—'); return; }
+  const pts=S.route.pts, to=pts[S.active], from=legFrom(), n=pts.length;
+  set('vWp', to.name);
+  const nextLeg = S.active<n-1 ? `pak ${fmtCrs(gBrg(to,pts[S.active+1]))} → ${pts[S.active+1].name}` : 'poslední bod trasy';
+  $('vWpSub').textContent=`úsek ${S.directFrom?'D→':from.name+'→'}${to.name} · ${nextLeg}`;
+  const dtk=gBrg(from,to);
+  set('vDtk', fmtCrs(dtk));
+  if(!S.pos){ set('vBrg','—'); set('vDist','—'); set('vEte','—'); set('vAlt','—'); $('vRem').innerHTML='&nbsp;'; lastXte=null; drawCDI(); $('xte').innerHTML='—<small>odchylka od trati</small>'; return; }
+  const d=gDist(S.pos,to), b=gBrg(S.pos,to), g=legGeom(from,to,S.pos);
+  // auto sequence: inside radius, or passed abeam the waypoint
+  if (S.active<n-1 && (d<=S.cfg.seq || (g.ate>=g.len && d<Math.max(2,S.cfg.seq*3)))){
+    const old=to.name; S.active++; S.directFrom=null; saveNav(); renderLegs();
+    const nt=pts[S.active], nd=gBrg(pts[S.active-1],nt);
+    const turn=S.trk!=null? angDiff(S.trk,nd) : 0;
+    showBanner(`${old} ✓  → ${nt.name}  kurz ${fmtCrs(nd)}`,'info',7000);
+    speak(`${spoken(old)}. Kurz ${spokenCrs(nd)}${Math.abs(turn)>10?(turn>0?', vpravo':', vlevo'):''}, na ${spoken(nt.name)}.`);
+    beep();
+    S.announced={};
+    return updateNav();
+  }
+  lastXte=g.xte;
+  set('vBrg', fmtCrs(b));
+  set('vDist', fD(d)+'<small>'+dU()+'</small>');
+  const gs=S.gs&&S.gs>20? S.gs : null;
+  const eteMin = gs? d/gs*60 : NaN;
+  let rem=d; for(let i=S.active+1;i<n;i++) rem+=gDist(pts[i-1],pts[i]);
+  set('vEte', gs? `${fmtTime(eteMin)}<small>${fmtClock(new Date(Date.now()+eteMin*60000))}</small>` : '—');
+  set('vAlt', S.alt!=null? Math.round(S.alt*3.28084)+'<small>ft</small>' : '—');
+  $('vRem').textContent=`zbývá ${fD(rem,0)} ${dU()}${gs?' · '+fmtTime(rem/gs*60):''}`;
+  const ax=Math.abs(g.xte), side=g.xte>0?'R':'L';
+  $('xte').innerHTML = `${ax<0.05?'0.0':fD(ax)} ${dU()} ${ax<0.05?'':side}<small>${ax<0.05?'na trati':(g.xte>0?'vpravo od trati':'vlevo od trati')+' · leť '+(g.xte>0?'vlevo':'vpravo')}</small>`;
+  drawCDI();
+
+  // alerts
+  if (gs && eteMin<=1 && S.active<n-1 && !S.announced.wp1){
+    S.announced.wp1=true;
+    const nd=gBrg(to,pts[S.active+1]), turn=angDiff(dtk,nd);
+    speak(`${spoken(to.name)} za minutu. Pak ${turn>0?'vpravo':'vlevo'} na ${spokenCrs(nd)}.`);
+  }
+  if (gs && eteMin<=1){
+    if (S.active<n-1){ const nd=gBrg(to,pts[S.active+1]), turn=angDiff(dtk,nd);
+      showBanner(`${to.name} za ${Math.max(0,Math.round(eteMin*60))} s → ${turn>0?'vpravo':'vlevo'} na ${fmtCrs(nd)}`,'info flash',0); }
+    else showBanner(`Cíl ${to.name} za ${Math.max(0,Math.round(eteMin*60))} s`,'info flash',0);
+  } else if (ax>S.cfg.cdi){
+    showBanner(`Mimo trať ${fD(ax,1)} ${dU()} ${g.xte>0?'vpravo':'vlevo'} · k bodu ${fmtCrs(b)}`,'warn',0);
+    if(!S.announced.off){ S.announced.off=true; speak(`Mimo trať, ${fD(ax,1).replace('.',',')} ${isKm()?'kilometru':'míle'} ${g.xte>0?'vpravo':'vlevo'}`); }
+  } else {
+    if (ax<S.cfg.cdi*0.7) S.announced.off=false;
+    clearStickyBanner();
+  }
+  if (S.active===n-1 && d<=S.cfg.seq && !S.announced.dest){ S.announced.dest=true; showBanner(`Cíl ${to.name} dosažen`,'info',8000); speak(`Cíl ${spoken(to.name)}.`); }
+}
+
+/* ================= banner, voice, beep ================= */
+let bannerTimer=null, bannerSticky=false;
+function showBanner(t,cls,ms){
+  const el=$('banner');
+  if (!ms && !bannerSticky && bannerTimer) return; // timed banner has priority
+  el.textContent=t; el.className=cls; clearTimeout(bannerTimer); bannerTimer=null; bannerSticky=!ms;
+  if(ms) bannerTimer=setTimeout(()=>{el.className='';bannerTimer=null;},ms);
+}
+function clearStickyBanner(){ if(bannerSticky){ $('banner').className=''; bannerSticky=false; } }
+const spoken = n => n.replace(/^WP0?/,'bod ').replace(/^TP0?/,'bod ').replace(/^[A-Z]{4}\s+(?=\S)/,'');
+const spokenCrs = t => { const v=Math.round(S.cfg.mag? norm360(t-S.cfg.variation):t)%360||360; return String(v).padStart(3,'0').split('').join(' '); };
+let csVoice=null;
+function pickVoice(){ try{ const v=speechSynthesis.getVoices(); csVoice=v.find(x=>/^cs/i.test(x.lang))||null; }catch(e){} }
+if('speechSynthesis' in window){ pickVoice(); speechSynthesis.onvoiceschanged=pickVoice; }
+function speak(t){
+  if(!S.cfg.voice || !('speechSynthesis' in window)) return;
+  try{ const u=new SpeechSynthesisUtterance(t); u.lang='cs-CZ'; if(csVoice) u.voice=csVoice; u.rate=1.05; speechSynthesis.speak(u);}catch(e){}
+}
+let actx=null;
+function beep(){ try{ if(!actx) return; const o=actx.createOscillator(),g=actx.createGain(); o.frequency.value=880; g.gain.value=.15;
+  o.connect(g).connect(actx.destination); o.start(); o.stop(actx.currentTime+.18);}catch(e){} }
+
+/* ================= GPS ================= */
+let watchId=null, simTimer=null;
+function onFix(lat,lon,alt,speedMs,headingDeg,acc,t){
+  const p={lat,lon};
+  // derive GS/TRK if device does not supply them
+  let gs = (speedMs!=null && speedMs>=0) ? speedMs*1.943844 : null;
+  let trk = (headingDeg!=null && isFinite(headingDeg) && headingDeg>=0) ? headingDeg : null;
+  if (S.lastRaw){
+    const dt=(t-S.lastRaw.t)/1000;
+    if (dt>=0.8){
+      const d=gDist(S.lastRaw,p);
+      if (gs==null) gs=d/dt*3600;
+      if (trk==null && d>0.004) trk=gBrg(S.lastRaw,p);
+      S.lastRaw={lat,lon,t};
+    }
+  } else S.lastRaw={lat,lon,t};
+  if (gs!=null) S.gs = S.gs==null? gs : S.gs*0.6+gs*0.4;
+  if (trk!=null && (S.gs||0)>8){
+    S.trk = S.trk==null? trk : norm360(S.trk + angDiff(S.trk,trk)*0.5);
+  }
+  S.pos=p; S.alt=alt; S.acc=acc; S.fixTime=Date.now();
+  const lh=S.hist[S.hist.length-1];
+  if(!lh || gDist(lh,p)>0.05){ S.hist.push(p); if(S.hist.length>3000) S.hist.shift(); }
+  updateNav(); requestRender(); gpsStatus();
+}
+function startGPS(){
+  stopGPS();
+  if (S.cfg.sim){ startSim(); return; }
+  if(!('geolocation' in navigator)){ showBanner('Zařízení nepodporuje polohu','bad',0); return; }
+  watchId=navigator.geolocation.watchPosition(
+    pos=>{ const c=pos.coords; onFix(c.latitude,c.longitude,c.altitude,c.speed,c.heading,c.accuracy,pos.timestamp||Date.now()); },
+    err=>{ $('gpsTxt').textContent='GPS: '+(err.code===1?'přístup zamítnut (Nastavení › Soukromí › Polohové služby)':err.message); $('gpsinfo').className=''; },
+    {enableHighAccuracy:true,maximumAge:0,timeout:20000});
+}
+function stopGPS(){ if(watchId!=null){navigator.geolocation.clearWatch(watchId);watchId=null;} if(simTimer){clearInterval(simTimer);simTimer=null;} }
+function gpsStatus(){
+  const age=(Date.now()-S.fixTime)/1000, el=$('gpsinfo');
+  if(!S.fixTime){ el.className=''; return; }
+  if (age>10){ el.className=''; $('gpsTxt').textContent=`GPS: ztráta signálu (${Math.round(age)} s)`; showBanner('Ztráta GPS signálu','bad',0); return; }
+  el.className = (S.acc!=null && S.acc>100)?'weak':'ok';
+  $('gpsTxt').textContent = (S.cfg.sim?'SIMULACE':'GPS')+(S.acc!=null?` ±${Math.round(S.acc)} m`:'');
+}
+// simulation: flies the route with a gentle weave
+let sim=null;
+function startSim(){
+  if(!S.route) return;
+  const pts=S.route.pts;
+  sim={pos:{...pts[Math.max(0,S.active-1)]}, tgt:S.active, t:0, alt:1500/3.28084};
+  simTimer=setInterval(()=>{
+    if(!S.route) return;
+    const tg=pts[Math.min(sim.tgt,pts.length-1)];
+    const step=S.cfg.simKt/3600; sim.t++;
+    if (gDist(sim.pos,tg)<step*1.5 && sim.tgt<pts.length-1) sim.tgt++;
+    const hd=norm360(gBrg(sim.pos,pts[sim.tgt]) + 12*Math.sin(sim.t/25));
+    sim.pos=gDest(sim.pos,hd,step);
+    sim.alt=(1500+150*Math.sin(sim.t/40))/3.28084;
+    onFix(sim.pos.lat,sim.pos.lon,sim.alt,S.cfg.simKt/1.943844,hd,8,Date.now());
+  },1000);
+}
+setInterval(()=>{ gpsStatus(); if(S.pos) updateNav(); },1000);
+
+/* ================= wake lock ================= */
+let wake=null;
+async function keepAwake(){ try{ if('wakeLock' in navigator){ wake=await navigator.wakeLock.request('screen'); } }catch(e){} }
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible' && S.started) keepAwake(); });
+
+/* ================= map interaction ================= */
+const ptrs=new Map(); let pinch0=null;
+function panBy(dx,dy){
+  const z=S.view.z, c=proj(S.view.lat,S.view.lon,z), r=S.view.rot*D2R, cs=Math.cos(r), sn=Math.sin(r);
+  const wx=dx*cs-dy*sn, wy=dx*sn+dy*cs; const n=unproj(c.x-wx,c.y-wy,z); S.view.lat=n.lat; S.view.lon=n.lon;
+}
+function setFollow(f){ S.follow=f; $('bFollow').classList.toggle('on',f); requestRender(); }
+function zoomBy(dz){ S.view.z=Math.max(5,Math.min(16,S.view.z+dz)); requestRender(); }
+mapCv.addEventListener('pointerdown',e=>{ mapCv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY}); pinch0=null; });
+mapCv.addEventListener('pointermove',e=>{
+  const p=ptrs.get(e.pointerId); if(!p) return;
+  if(ptrs.size===1){ const dx=e.clientX-p.x, dy=e.clientY-p.y; if(Math.abs(dx)+Math.abs(dy)>0){ if(S.follow){ if(Math.hypot(dx,dy)<6) return; setFollow(false);} panBy(dx,dy); requestRender(); } }
+  p.x=e.clientX; p.y=e.clientY;
+  if(ptrs.size===2){ const [a,b]=[...ptrs.values()], d=Math.hypot(a.x-b.x,a.y-b.y);
+    if(pinch0) { S.view.z=Math.max(5,Math.min(16,S.view.z+Math.log2(d/pinch0))); requestRender(); } pinch0=d; }
+});
+const up=e=>{ ptrs.delete(e.pointerId); pinch0=null; };
+mapCv.addEventListener('pointerup',up); mapCv.addEventListener('pointercancel',up);
+mapCv.addEventListener('wheel',e=>{ e.preventDefault(); zoomBy(-e.deltaY/300); },{passive:false});
+$('bZin').onclick=()=>zoomBy(0.5); $('bZout').onclick=()=>zoomBy(-0.5);
+$('bFollow').onclick=()=>setFollow(!S.follow);
+const ORIENT={ trk:['TRK<br>UP','Mapa ve směru letu (traťový úhel z GPS)'], dtk:['DTK<br>UP','Mapa ve směru plánované trati'], north:['N<br>UP','Sever nahoře'] };
+function showOrient(announce){
+  const o=S.cfg.orient, b=$('bOrient'); b.innerHTML='<small>'+ORIENT[o][0]+'</small>'; b.classList.toggle('on',o!=='north');
+  if (announce) showBanner(ORIENT[o][1],'info',2000);
+}
+$('bOrient').onclick=()=>{ const seq=['trk','dtk','north']; S.cfg.orient=seq[(seq.indexOf(S.cfg.orient)+1)%3]; LS.set('cfg',S.cfg); showOrient(true); requestRender(); };
+document.addEventListener('gesturestart',e=>e.preventDefault());
+
+/* ================= legs drawer ================= */
+// ---- navigační plán: vítr, GS, kurz, časy úseků ----
+function legPlan(){
+  const pts=S.route.pts, ws=+S.cfg.ws||0, wd=+S.cfg.wd||0, out=[]; let cum=0, cumD=0, bad=false;
+  for(let i=1;i<pts.length;i++){
+    const a=pts[i-1], b=pts[i], tc=gBrg(a,b), L=gDist(a,b), tas=pts[i].spd||S.cfg.tas;
+    const rel=(wd-tc)*D2R, x=ws/tas*Math.sin(rel);
+    let wca=0, gs=tas;
+    if (ws>0){ if(Math.abs(x)>=1){ gs=NaN; bad=true; } else { wca=Math.asin(x)*R2D; gs=tas*Math.cos(Math.asin(x))-ws*Math.cos(rel); } }
+    if (!(gs>0)){ gs=NaN; bad=true; }
+    const t=L/gs*60; cum+=t; cumD+=L;
+    out[i]={tc, th:norm360(tc+wca), wca, L, gs, tas, t, cum, cumD, custom:!!pts[i].spd};
+  }
+  out.total={L:cumD, t:cum, bad}; return out;
+}
+const fmtMin = m => isFinite(m)? Math.max(1,Math.round(m))+' min' : '—';
+const fmtHM  = m => { if(!isFinite(m)) return '—'; const r=Math.round(m); return Math.floor(r/60)+':'+String(r%60).padStart(2,'0'); };
+function depDate(){ const v=S.cfg.dep; if(!v) return null; const [h,m]=v.split(':').map(Number); const d=new Date(); d.setHours(h,m,0,0); return d; }
+const etaAt = min => { const d=depDate(); return d&&isFinite(min)? fmtClock(new Date(d.getTime()+Math.round(min)*60000)) : null; };
+function renderLegs(){
+  const el=$('legList'); if(!S.route){ el.innerHTML='<div class="note">Není nahraná žádná trasa.</div>'; return; }
+  // vstupní pole se vytvoří jednou a dál se nepřekreslují (jinak by se ztratilo rozepsané pole)
+  if (!$('planHdr')){
+    el.innerHTML=`<div class="plan" id="planHdr">
+      <label>Rychlost <input id="pTas" type="number" inputmode="decimal"> <span class="uS">kt</span></label>
+      <label>Vítr z <input id="pWd" type="number" inputmode="numeric" placeholder="—">°T
+        <input id="pWs" type="number" inputmode="decimal" placeholder="0"> <span class="uS">kt</span></label>
+      <label>Odlet <input id="pDep" type="time"><button class="b sm" id="pNow">teď</button></label>
+    </div>
+    <div class="tot sum" id="planSum"></div>
+    <div class="legtools"><button class="b" id="bSuggest">Navrhnout názvy</button><button class="b" id="bExport">Export GPX</button><button class="b" id="bCopyPlan">Kopírovat plán</button></div>
+    <div id="legRows"></div>`;
+  }
+  // hodnoty doplň jen do polí, ve kterých uživatel právě nepíše
+  const setIn=(id,v)=>{ const e=$(id); if(document.activeElement!==e) e.value=v; };
+  setIn('pTas', Math.round(sV(S.cfg.tas)));
+  setIn('pWd', (S.cfg.wdSet||S.cfg.ws>0)? String(Math.round(S.cfg.wd)).padStart(3,'0') : '');
+  setIn('pWs', S.cfg.ws>0? Math.round(sV(S.cfg.ws)) : '');
+  setIn('pDep', S.cfg.dep||'');
+  document.querySelectorAll('#planHdr .uS').forEach(e=>e.textContent=sU());
+  renderPlanBody();
+}
+function renderPlanBody(){
+  const pts=S.route.pts, P=legPlan(), wind=(+S.cfg.ws||0)>0, cl=S.cfg.mag?'M':'T';
+  $('planSum').innerHTML=`Celkem <b>${fD(P.total.L,1)} ${dU()}</b> · <b>${fmtHM(P.total.t)}</b>${etaAt(P.total.t)?` · přílet <b>${etaAt(P.total.t)}</b>`:''}${wind?` · vítr ${String(Math.round(S.cfg.wd)).padStart(3,'0')}°/${Math.round(sV(S.cfg.ws))} ${sU()}`:' · bez větru'}${P.total.bad?' · <span style="color:var(--bad)">vítr silnější než rychlost!</span>':''}`;
+  let h='';
+  pts.forEach((p,i)=>{
+    const cls=i===S.active?'act':(i<S.active?'done':'');
+    let d;
+    if(i>0){ const q=P[i];
+      d=`<div class="d">${S.cfg.mag?'MK':'TK'} ${fmtCrs(q.tc)} · ${fD(q.L,1)} ${dU()}${wind?` · kurz ${fmtCrs(q.th)}${cl} (${q.wca>=0?'+':''}${Math.round(q.wca)}°)`:''}</div>
+         <div class="d t">${wind||q.custom?`GS ${isFinite(q.gs)?Math.round(sV(q.gs)):'—'} ${sU()}${q.custom?` <span title="vlastní rychlost úseku">(TAS ${Math.round(sV(q.tas))}*)</span>`:''} · `:''}<b>${fmtMin(q.t)}</b> · Σ ${fmtHM(q.cum)}${etaAt(q.cum)?` · ETA <b>${etaAt(q.cum)}</b>`:''}</div>`;
+    } else d=`<div class="d">start${etaAt(0)?` · odlet <b>${etaAt(0)}</b>`:''}</div>`;
+    h+=`<div class="leg ${cls}"><div><div class="n">${esc(p.name)}</div>${d}</div>
+      <div class="acts"><button class="ed" data-ed="${i}">✎</button>${i>0?`<button data-leg="${i}">Úsek</button>`:''}<button class="dto" data-dto="${i}">D→</button></div></div>`;
+  });
+  h+=`<div class="note">Časy počítány z nastavené rychlosti${wind?' a větru (trojúhelník rychlostí)':' bez větru'}. Vlastní rychlost úseku nastavíš přes ✎ (označeno *). Vítr se zadává ve °T, jak ho uvádí předpověď.</div>`;
+  $('legRows').innerHTML=h;
+}
+function planText(){
+  const pts=S.route.pts, P=legPlan(), wind=(+S.cfg.ws||0)>0, cl=S.cfg.mag?'M':'T';
+  const L=[`${S.route.name} · rychlost ${Math.round(sV(S.cfg.tas))} ${sU()}${wind?` · vítr ${String(Math.round(S.cfg.wd)).padStart(3,'0')}°/${Math.round(sV(S.cfg.ws))} ${sU()}`:''}${S.cfg.dep?` · odlet ${S.cfg.dep}`:''}`, ''];
+  L.push(['Úsek'.padEnd(36), (cl==='M'?'MK':'TK').padStart(5), `kurz${cl}`.padStart(6), dU().padStart(6), 'GS'.padStart(5), 'čas'.padStart(6), 'Σ'.padStart(6), 'ETA'.padStart(6)].join(''));
+  for(let i=1;i<pts.length;i++){ const q=P[i];
+    L.push([(pts[i-1].name+' → '+pts[i].name).slice(0,35).padEnd(36), fmtCrs(q.tc).padStart(5), fmtCrs(q.th).padStart(6), fD(q.L,1).padStart(6),
+      String(isFinite(q.gs)?Math.round(sV(q.gs)):'—').padStart(5), fmtMin(q.t).replace(' min','′').padStart(6), fmtHM(q.cum).padStart(6), (etaAt(q.cum)||'').padStart(6)].join(''));
+  }
+  L.push('', `Celkem ${fD(P.total.L,1)} ${dU()} · ${fmtHM(P.total.t)}${etaAt(P.total.t)?' · přílet '+etaAt(P.total.t):''}`);
+  return L.join('\n');
+}
+const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+$('legList').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  if(b.id==='bSuggest'){ suggestAll(); return; }
+  if(b.id==='pNow'){ const d=new Date(); S.cfg.dep=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); LS.set('cfg',S.cfg); $('pDep').value=S.cfg.dep; renderPlanBody(); return; }
+  if(b.id==='bCopyPlan'){ const t=planText(); (navigator.clipboard? navigator.clipboard.writeText(t):Promise.reject()).then(()=>showBanner('Navigační plán zkopírován','info',2500)).catch(()=>showBanner('Kopírování se nepodařilo','bad',3000)); return; }
+  if(b.id==='bExport'){ exportGPX(); return; }
+  if(b.dataset.ed){ openNameDlg(+b.dataset.ed); return; }
+  if(b.dataset.leg) activateLeg(+b.dataset.leg);
+  if(b.dataset.dto) directTo(+b.dataset.dto);
+  $('dLegs').classList.remove('open');
+});
+function onPlanInput(e){
+  const id=e.target.id, raw=e.target.value, v=parseFloat(String(raw).replace(',','.')), c=S.cfg;
+  if(id==='pTas'){ if(v>=20) c.tas=fromS(v); else return; }
+  else if(id==='pWd'){ if(raw===''){ c.wd=0; c.wdSet=false; } else if(isFinite(v)){ c.wd=norm360(v); c.wdSet=true; } }
+  else if(id==='pWs'){ c.ws=isFinite(v)&&v>0? fromS(v):0; }
+  else if(id==='pDep'){ c.dep=raw||''; }
+  else return;
+  LS.set('cfg',c); renderPlanBody();
+  if(id==='pTas' && e.type==='change') fillUnits();
+}
+$('legList').addEventListener('input',onPlanInput);
+$('legList').addEventListener('change',onPlanInput);
+$('bLegs').onclick=()=>{ renderLegs(); $('dSet').classList.remove('open'); $('dLegs').classList.toggle('open'); };
+$('bSet').onclick=()=>{ $('dLegs').classList.remove('open'); $('dSet').classList.toggle('open'); };
+document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>b.closest('.drawer').classList.remove('open'));
+$('bPrev').onclick=()=>sequence(-1); $('bNext').onclick=()=>sequence(1);
+
+/* ================= settings ================= */
+function fillUnits(){
+  const c=S.cfg, r=(v,d)=>String(+v.toFixed(d));
+  $('sDu').value=c.du; $('sSu').value=c.su;
+  $('sSeq').value=r(dV(c.seq),2); $('sCdi').value=r(dV(c.cdi),1);
+  $('sTas').value=r(sV(c.tas),0); $('sSimKt').value=r(sV(c.simKt),0);
+  $('sSeq').step=$('sCdi').step=isKm()?'0.5':'0.1'; $('sTas').step=$('sSimKt').step=isKmh()?'10':'5';
+  document.querySelectorAll('.uD').forEach(e=>e.textContent=dU()); document.querySelectorAll('.uS').forEach(e=>e.textContent=sU());
+}
+function bindSettings(){
+  const c=S.cfg;
+  $('sMap').value=c.map; $('sMag').value=c.mag?'1':'0'; $('sVar').value=c.variation;
+  fillUnits(); $('sVoice').checked=c.voice; $('sNight').checked=c.night;
+  $('sSim').checked=c.sim; $('sUnder').checked=c.underlay;
+  $('sUnder').onchange=e=>{c.underlay=e.target.checked;LS.set('cfg',S.cfg);requestRender();};
+  const save=()=>{ LS.set('cfg',S.cfg); renderLegs(); updateNav(); requestRender(); drawCDI(); };
+  $('sMap').onchange=e=>{c.map=e.target.value;save(); if(c.map==='icao'&&!CHART.meta) showBanner('Nejdřív nahraj mapu ICAO (.mbtiles)','warn',5000);};
+  $('sMag').onchange=e=>{c.mag=e.target.value==='1';save();};
+  $('sVar').onchange=e=>{c.variation=parseFloat(e.target.value)||0;save();};
+  const inD=v=>v/(isKm()?KM:1), inS=v=>v/(isKmh()?KM:1);
+  $('sSeq').onchange=e=>{c.seq=Math.max(0.1,inD(parseFloat(e.target.value))||0.5);save();fillUnits();};
+  $('sCdi').onchange=e=>{c.cdi=Math.max(0.25,inD(parseFloat(e.target.value))||2);save();fillUnits();};
+  $('sTas').onchange=e=>{c.tas=Math.max(30,inS(parseFloat(e.target.value))||90);save();fillUnits();};
+  $('sDu').onchange=e=>{c.du=e.target.value;save();fillUnits();updateStartInfo();};
+  $('sSu').onchange=e=>{c.su=e.target.value;save();fillUnits();};
+  $('sVoice').onchange=e=>{c.voice=e.target.checked;save(); if(c.voice) speak('Hlasová upozornění zapnuta');};
+  $('sNight').onchange=e=>{c.night=e.target.checked;save();};
+  $('sSim').onchange=e=>{c.sim=e.target.checked; S.hist=[]; S.lastRaw=null; S.gs=null; S.trk=null; S.pos=null; S.fixTime=0; save(); if(S.started) startGPS();};
+  $('sSimKt').onchange=e=>{c.simKt=Math.max(40,inS(parseFloat(e.target.value))||100);save();fillUnits();};
+  $('bClearTrk').onclick=()=>{S.hist=[];requestRender();};
+}
+
+
+/* ================= vlastní mapa ICAO: MBTiles -> IndexedDB ================= */
+const CHART = { meta: LS.get('chartMeta', null), db: null };
+function chartDB(){
+  if (CHART.db) return Promise.resolve(CHART.db);
+  return new Promise((res,rej)=>{ const r=indexedDB.open('pplnav-chart',1);
+    r.onupgradeneeded=()=>r.result.createObjectStore('tiles');
+    r.onsuccess=()=>{CHART.db=r.result;res(r.result);}; r.onerror=()=>rej(r.error); });
+}
+function chartTx(mode,fn){ return chartDB().then(db=>new Promise((res,rej)=>{
+  const tx=db.transaction('tiles',mode), st=tx.objectStore('tiles'); let out; const r=fn(st);
+  if (r) r.onsuccess=()=>{out=r.result;};
+  tx.oncomplete=()=>res(out); tx.onerror=()=>rej(tx.error); tx.onabort=()=>rej(tx.error||new Error('abort'));
+})); }
+const chartGet = k => chartTx('readonly', st=>st.get(k));
+const chartPut = list => chartTx('readwrite', st=>{ for(const [k,v] of list) st.put(v,k); });
+const chartClear = () => chartTx('readwrite', st=>st.clear());
+function chartCovers(z,x,y){
+  const b=CHART.meta && CHART.meta.bounds; if(!b) return true;
+  const n=2**z, lonL=x/n*360-180, lonR=(x+1)/n*360-180;
+  const latT=unproj(0,y*256,z).lat, latB=unproj(0,(y+1)*256,z).lat;
+  return !(lonR<b[0]||lonL>b[2]||latT<b[1]||latB>b[3]);
+}
+function chartInfo(){
+  const m=CHART.meta;
+  $('chartInfo').textContent = m ? `${m.name} · ${m.count} dlaždic · zoom ${m.minz}–${m.maxz} · ${(m.bytes/1048576).toFixed(0)} MB` : 'nenahraná';
+}
+function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>rej(new Error('Nelze načíst '+src)); document.head.appendChild(s); }); }
+function progress(txt,f){ const el=$('prog'); if(txt==null){ el.style.display='none'; return; } el.style.display='flex'; $('progTxt').textContent=txt; $('progBar').style.width=Math.round((f||0)*100)+'%'; }
+const sniffMime = d => d[0]===0x89&&d[1]===0x50 ? 'image/png' : d[0]===0xFF&&d[1]===0xD8 ? 'image/jpeg' : d[0]===0x52&&d[1]===0x49 ? 'image/webp' : 'application/octet-stream';
+async function importMBTiles(file){
+  progress('Načítám soubor…',0);
+  try{
+    if (!window.initSqlJs) await loadScript('sql-wasm.js');
+    const SQL = await initSqlJs({ locateFile: f => f });
+    const db = new SQL.Database(new Uint8Array(await file.arrayBuffer()));
+    const meta={}; try{ const r=db.exec('SELECT name,value FROM metadata'); if(r[0]) for(const [k,v] of r[0].values) meta[k]=v; }catch(e){}
+    let total=0; try{ total=db.exec('SELECT COUNT(*) FROM tiles')[0].values[0][0]; }catch(e){ throw new Error('Soubor není MBTiles (chybí tabulka tiles).'); }
+    if (!total) throw new Error('MBTiles neobsahuje žádné dlaždice.');
+    await chartClear(); tileCache.clear();
+    const st=db.prepare('SELECT zoom_level,tile_column,tile_row,tile_data FROM tiles');
+    let batch=[], n=0, bytes=0, minz=99, maxz=0, bb=[180,90,-180,-90];
+    while(st.step()){
+      const [z,x,row,data]=st.get(); if(!data||!data.length) continue;
+      const y=(2**z)-1-row; // TMS -> XYZ
+      batch.push([z+'/'+x+'/'+y, new Blob([data],{type:sniffMime(data)})]);
+      n++; bytes+=data.length; minz=Math.min(minz,z); maxz=Math.max(maxz,z);
+      if (batch.length>=250){ await chartPut(batch); batch=[]; progress(`Ukládám mapu do iPadu… ${n} / ${total}`, n/total); }
+    }
+    if (batch.length) await chartPut(batch);
+    // bounds: from metadata, or from tiles of the top zoom
+    let bounds=null;
+    if (meta.bounds){ const v=meta.bounds.split(',').map(Number); if(v.length===4&&v.every(isFinite)) bounds=v; }
+    if (!bounds){ const r=db.exec(`SELECT MIN(tile_column),MAX(tile_column),MIN(tile_row),MAX(tile_row) FROM tiles WHERE zoom_level=${maxz}`)[0].values[0];
+      const N=2**maxz, yT=N-1-r[3], yB=N-1-r[2];
+      bounds=[r[0]/N*360-180, unproj(0,(yB+1)*256,maxz).lat, (r[1]+1)/N*360-180, unproj(0,yT*256,maxz).lat]; }
+    st.free(); db.close();
+    CHART.meta={ name: meta.name||file.name.replace(/\.mbtiles$/i,''), count:n, bytes, minz, maxz, bounds, date:Date.now() };
+    LS.set('chartMeta',CHART.meta);
+    try{ navigator.storage && navigator.storage.persist && navigator.storage.persist(); }catch(e){}
+    S.cfg.map='icao'; LS.set('cfg',S.cfg); $('sMap').value='icao';
+    chartInfo(); progress(null); requestRender();
+    showBanner(`Mapa ICAO nahrána (${n} dlaždic)`,'info',4000);
+  }catch(err){
+    progress(null); showBanner('Import mapy selhal: '+err.message,'bad',8000);
+  }
+}
+const chartIn=$('chartFile');
+$('bChart').onclick=()=>chartIn.click();
+chartIn.onchange=()=>{ const f=chartIn.files[0]; chartIn.value=''; if(f) importMBTiles(f); };
+$('bChartDel').onclick=async()=>{ await chartClear().catch(()=>{}); CHART.meta=null; LS.set('chartMeta',null); tileCache.clear(); chartInfo(); requestRender(); };
+
+
+/* ================= názvy bodů ================= */
+// letiště v okolí ČR (OurAirports, public domain): [kód, název, lat, lon]
+const AD = [["","Ameis Airstrip",48.65784,16.54023],["","Herrnbaumgarten Airstrip",48.6976,16.6598],["","Kottingneusiedl",48.69335,16.46472],["","Tandem Airlebnis Paraglider Field",48.61453,15.40598],["","Flugplatz Usting",48.31459,13.71796],["","Spannberg Airstrip",48.45051,16.74912],["","Borek",50.21086,14.65769],["","Pěnčín",49.56829,16.99918],["","Bezdružice Airstrip",49.89971,12.96496],["","Bynovec",50.8219,14.27174],["","Ramŝ",50.64167,14.54139],["","Česká Třebová Airstrip",49.91,16.45528],["","Český Dub",50.67806,14.99972],["","Vodňany Airstrip",49.12821,14.17325],["","Částkovice",49.40935,15.14369],["","Chabeřice Private ULM Airstrip",49.74757,15.06424],["","Studenec ULM",50.54958,15.53591],["","Teplice",50.62083,13.80977],["","Chotěšov",49.65167,13.18972],["","Kotvrdovice",49.36399,16.7849],["","Kramolín UL",48.915,14.72639],["","Jiřičky UL",49.55222,15.15556],["","Kaplice UL",48.71861,14.45056],["","Frymburk ULM",48.69861,14.1975],["","Druzcov u Lípy Ultralight",50.72779,14.92524],["","Stará Voda Emergency Field",49.99679,12.57512],["","Vrátkov",50.03954,14.82274],["","Buranos Aires Ultralight Strip",50.00893,14.03774],["","Bořitov ULM",49.43554,16.59305],["","Miroslav Aircon ULM",48.93167,16.33972],["","Slušovice",49.25903,17.81334],["","Chřibská",50.85819,14.46569],["","Polepy",50.52027,14.27224],["","Říčany Airstrip",49.97444,14.64917],["","Sázava",49.88783,14.94055],["","Třebíč",49.19833,15.90306],["","Borovník",49.35861,16.24222],["","Škudly Airstrip",50.02194,15.52056],["","Jehnědí",49.965,16.30972],["","Kunětice",50.06833,15.8125],["","Charvátce",50.43343,13.81111],["","Letovice",49.54667,16.59861],["","Lomnice nad Popelkou",50.54,15.38806],["","Boršice",49.05151,17.36761],["","Horní Počáply Airstrip",50.41812,14.38427],["","Strážnice",48.88778,17.29444],["","Boleradice",48.96194,16.83167],["","Opava-Velké Hoštice",49.94056,17.98611],["","Doudleby Airstrip",48.88504,14.48638],["","Hory",50.21695,12.77669],["","Ostrov",50.33628,12.96915],["","Bystřice nad Pernštejnem",49.52278,16.23222],["","Choteč",50.43389,15.53056],["","Dětřichov Oáza ULM",49.72917,17.11806],["","Záhoří",49.46639,17.66528],["","Plešnice",49.77222,13.16222],["","Rohozec",49.98194,15.39278],["","Sazomín Ultralight Field",49.50861,15.97111],["","Bezno Airstrip",50.35692,14.80683],["","Dušníky Ultralight",50.41278,14.19806],["","Miroslav ULM",48.93139,16.29861],["","Příchvoj u Jičína ULM",50.44135,15.23598],["","Kralovice Airstrip",49.98509,13.52882],["","Katovice Airstrip",49.26835,13.80078],["","Kněžmost Airstrip",50.47862,15.00551],["","Dynín Airstrip",49.12834,14.63344],["","Zbudov Airstrip",50.11153,16.51745],["","Kozojedy Airstrip",50.325,15.3889],["","Poličná-Juřinka",49.47593,17.92634],["","Ivančice u Brna ULM",49.09537,16.48052],["","Kelč Airstrip",49.45777,17.82017],["","Štětí Airstrip",50.465,14.40611],["","Všeň Airstrip",50.55511,15.09461],["","Kněžice u Jičína",50.263,15.29741],["","Poděbrady",50.18431,15.16655],["","Opava-Kylešovice Airstrip",49.89917,17.92296],["","Velké Pavlovice",48.88056,16.825],["","Osičiny Airstrip",50.01647,14.77221],["","Horní Libchava Ultralight",50.70301,14.49898],["","Želeč Airstrip",49.33055,14.65889],["","Bojkovice",49.03023,17.81786],["","Křinec Airstrip",50.2547,15.12511],["","Nová Včelnice Airstrip",49.26722,15.07778],["","Litomyšl ULM",49.87414,16.3364],["","Strachotice u Znojma ULM",48.80669,16.16148],["","Radovesice",50.40905,14.08401],["","Loučeň Airstrip",50.27874,15.06101],["","Zbilidy Ultrallightport",49.44803,15.44008],["","Stará Paka",50.50139,15.48306],["","Lipová Sport",51.00873,14.34385],["","Jinošov Airstrip",49.22693,16.1766],["","Bánov Airstrip",48.9834,17.70459],["","Veselí u Přelouče",50.00682,15.61692],["","Trutnov-Volanov",50.5675,15.86528],["","Místek",49.65278,18.34583],["","Letiště Hať u Hlučína",49.95181,18.26516],["","Náchod Vysokov",50.41296,16.12185],["","Moravský Beroun",49.78611,17.48611],["","Šumvald Ultralight Airstrip",49.8452,17.13848],["","Sedliště Airstrip",49.72207,18.37492],["","Nučice",49.9511,14.86994],["","Milhostov u Chebu ULM",50.16412,12.46409],["LKLU","Luhačovice",49.08819,17.71877],["","Mladá",50.24359,14.85586],["","Excalibur City",48.76155,16.05541],["","Nabočany Airstrip",49.946,15.89545],["","Kravi Hora",48.91704,16.84132],["","Chvojenec Airstrip",50.10863,15.92674],["","Dolní Bojanovice Airstrip",48.85482,17.01794],["","Šeborov South Airstrip",49.35564,15.929],["","Kejžlice",49.5919,15.40137],["","Budkovice",49.07869,16.35562],["","Rovná u Sokolova Airstrip",50.10113,12.67876],["","Letiště Orlová",49.85503,18.43521],["","Česká Skalice Ultralight",50.39967,15.99102],["","Strachotín u Mikulova Airstrip",48.91722,16.65883],["","Bobrová Ultralight",49.4955,16.10199],["","Třebihošť ULM",50.43546,15.69312],["","Luka nad Jihlavou ULM",49.38244,15.71368],["","Hrabice airstrip",49.06812,13.7603],["","Přešťovice u Strakonic Airstrip",49.28438,13.96844],["","Jestřabí v Krkonoších ULM",50.68215,15.48237],["","Manětín Airstrip",49.9828,13.22784],["","Kostelec Airstrip",49.67076,13.03224],["","Moravské Budějovice",49.04269,15.82864],["","Jilemnice Airstrip",50.61056,15.53862],["","Mříčná Airstrip",50.59624,15.48122],["","Radim u Chrudimi ULM",49.90672,16.00672],["","Domaželice Airstrip",49.44472,17.54156],["","Vyskeř UL",50.53714,15.15714],["","Slezská Harta Airstrip",49.90879,17.53577],["","Kněževes Airstrip",49.4619,15.98493],["","Choceň Airstrip",49.97728,16.18492],["","Písek UL Airstrip",49.33944,14.11389],["","Podbořany Airstrip",50.25067,13.40972],["","Brťov",49.41086,16.49944],["","Budíškovice Airstrip",49.07552,15.54656],["","Chrášťany",50.05872,14.92307],["","Syrovice",49.08774,16.54078],["","Vraclav u Vysokého Mýta ULM",49.95313,16.10776],["","Dlouhé Dvory",50.26494,15.73942],["","Stránecká Zhoř cropduster strip",49.38575,15.93104],["","Březno u Chomutova Airstrip",50.40943,13.44546],["","Šeborov North UL",49.35782,15.93147],["","Litochovice u Strakonic Airstrip",49.15434,13.95672],["","Březí Falcon",49.33889,16.23137],["","Milovice UL",50.23743,14.90999],["","Zvole Western",49.47985,16.17137],["","Kostomlaty Airstrip",50.20843,14.92585],["","Cebin",49.31868,16.49682],["","Chornice",49.6861,16.73091],["","Hlaska",49.06694,14.24139],["","Krpy",50.32592,14.66553],["","Liban",50.37044,15.20104],["","Napajedla",49.19889,13.6],["","Horni Prim",50.22931,15.70205],["","Terezín",50.51944,14.15583],["","Kozmice Airstrip",49.91333,18.1643],["","Vracov Cropduster Airstrip",48.98146,17.23771],["","Jarošov Airstrip",49.18714,15.04273],["","Nový Jičín Airstrip",49.63195,18.12781],["","Hradčany",50.61925,14.73275],["","Zlín Štípa",49.27278,17.74639],["","Trnávka Airstrip",49.69157,18.16402],["","Brusné",49.36788,17.65228],["","Lukla Airstrip",50.51102,13.33914],["","Nížkovice Airstrip",49.11761,16.89077],["","Bitozeves",50.37272,13.63398],["","Panoší Újezd",50.03867,13.69681],["","Lochousice",49.67491,13.09942],["","Jeneč Airstrip",50.0825,14.22278],["","Rabi",49.27515,13.62781],["","Jilmovi Ultralight Strip",49.3983,16.32169],["","Bošovice Airstrip",49.06051,16.8434],["","Vlastibořice Airstrip",50.61929,15.03542],["","Žihle u Plas Airstrip",50.03095,13.33782],["","Budkov Airstrip",49.07178,15.65954],["","Cham-Janahof",49.21205,12.6541],["","Tirschenreuth",49.8739,12.3281],["","Altötting",48.2162,12.6484],["","Rammertshof Amberg",49.4394,11.8107],["","Tröstau Glider Field",50.01876,11.93326],["","Erbendorf",49.8438,12.06714],["","Gammelsdorf Glider Field",48.5679,11.9325],["","Oberhinkofen",48.9517,12.1467],["","Riesa-Canitz",51.3024,13.228],["","Hohenthann",48.66444,12.05361],["","Wasentegernbach",48.27778,12.22222],["","Arnschwang ULM",49.27163,12.77831],["","Zschorna Ultralight",51.38645,12.8211],["","Hartenstein-Thierfeld Ultralight",50.6758,12.67895],["","Pretzschendorf Ultralight",50.88404,13.53104],["","Göpfersdorf",50.91387,12.61293],["","Beedeln Ultralight Flightpark",51.00724,12.81454],["","Brauna",51.28286,14.05552],["","Mohorn",50.99796,13.44617],["","Machern Cropduster Strip",51.35862,12.61178],["","Aßberg UL",48.71549,13.68585],["EDAB","Bautzen",51.19361,14.51972],["EDAC","Leipzig–Altenburg",50.98195,12.50639],["EDAG","Großrückerswalde",50.64417,13.12639],["EDAJ","Gera-Leumnitz",50.88167,12.13583],["EDAK","Großenhain",51.30806,13.55556],["EDAM","Merseburg",51.36256,11.94113],["EDAR","Pirna-Pratzschwitz",50.9796,13.90845],["EDAU","Riesa-Göhlis",51.29361,13.35611],["EDBI","Zwickau",50.70167,12.45389],["EDBR","Rothenburg/Görlitz",51.36333,14.95],["EDBX","Görlitz",51.15889,14.95028],["EDCH","Sprossen (Zeitz)",51.04341,12.23189],["EDCI","Klix",51.27182,14.50571],["EDCJ","Chemnitz/Jahnsdorf",50.7475,12.8375],["EDCM","Kamenz",51.29694,14.1275],["EDCT","Taucha",51.395,12.53694],["EDDC","Dresden",51.13412,13.76783],["EDME","Eggenfelden",48.39611,12.72361],["EDMF","Fürstenzell",48.51805,13.34583],["EDML","Landshut",48.51202,12.03486],["EDMP","Vilsbiburg",48.42611,12.34528],["EDMS","Straubing",48.90083,12.51667],["EDMV","Vilshofen",48.635,13.19556],["EDMW","Deggendorf",48.83028,12.87972],["EDMY","Mühldorf",48.27958,12.50045],["EDNA","Ampfing-Waldkraiburg",48.26361,12.41167],["EDNB","Arnbruck",49.12472,12.98556],["EDNF","Elsenthal Grafe",48.8225,13.3675],["EDNK","Kirchdorf/Inn",48.23833,12.97667],["EDNM","Nittenau-Bruck",49.2225,12.29667],["EDNP","Pfarrkirchen",48.42028,12.86472],["EDNR","Regensburg-Oberhub",49.14194,12.08194],["EDOA","Auerbach",50.4973,12.37799],["EDOE","Böhlen",51.21389,12.36361],["EDOH","Langhennersdorf",50.94833,13.26167],["EDOQ","Oschatz",51.29677,13.07869],["EDOT","Greiz-Obergrochlitz",50.64398,12.17457],["EDPD","Dingolfing",48.65673,12.49879],["EDPF","Schwandorf",49.33972,12.18806],["EDPG","Griesau",48.95389,12.42139],["EDPI","Moosburg auf der Kippe",48.45659,11.94162],["EDPQ","Schmidgaden",49.42944,12.09806],["EDPS","Flugplatz Sonnen",48.68278,13.69472],["EDQM","Hof-Plauen",50.28854,11.85288],["EDQW","Weiden in der Oberpfalz",49.6789,12.1164],["EPBA","Bielsko-Biała Aleksandrowice",49.805,19.0019],["EPDS","Witków",50.79686,16.11448],["EPGL","Gliwice-Trynek",50.26874,18.67247],["EPJG","Jelenia Góra",50.8989,15.7856],["EPJS","Jeżów Sudecki",50.94403,15.76653],["EPKM","Katowice-Muchowiec",50.23818,19.03368],["EPKN","Opole-Kamień Śląski",50.5306,18.07928],["EPKT","Katowice Wojciech Korfanty International",50.47601,19.0807],["EPKW","Bielsko-Biała Kaniów",49.94159,19.01957],["EPMR","Mirosławice Private",50.9578,16.7703],["EPOP","Opole-Polska Nowa Wieś",50.6333,17.7817],["EPRG","Rybnik-Gotartowice Glider Field",50.0708,18.6283],["EPSS","Świdnica - Krzczonów Airstrip",50.81718,16.58186],["EPWR","Copernicus Wrocław",51.10372,16.8821],["EPWS","Wrocław-Szymanów",51.2061,16.9986],["EPZK","Konopnica",51.36018,18.82206],["ETIC","Grafenwöhr Army Air Field",49.6987,11.9402],["ETIH","Hohenfels Army",49.21654,11.83606],["LKBA","Břeclav",48.79044,16.89253],["LKBE","Benešov",49.7408,14.6447],["LKBO","Bohuňovice",49.6706,17.295],["LKBR","Broumov",50.5619,16.3428],["LKBU","Bubovice",49.9744,14.1781],["LKCB","Cheb",50.0661,12.4117],["LKCE","Česká Lípa",50.7094,14.5667],["LKCH","Chomutov",50.4689,13.4681],["LKCM","Medlánky",49.2367,16.555],["LKCR","Chrudim",49.9364,15.7806],["LKCS","České Budějovice South Bohemian",48.94817,14.42832],["LKCT","Chotěboř",49.6858,15.6761],["LKCV","Čáslav Air Base",49.9397,15.3818],["LKDK","Dvůr Králové nad Labem",50.4142,15.8369],["LKER","Erpužice",49.8028,13.0381],["LKFR","Frýdlant",49.5894,18.3792],["LKHB","Havlíčkův Brod",49.5972,15.5492],["LKHC","Hořice",50.3576,15.57698],["LKHD","Hodkovice nad Mohelkou",50.6572,15.0778],["LKHK","Hradec Králové",50.2532,15.8452],["LKHN","Hranice",49.5461,17.7044],["LKHS","Hosín",49.04,14.495],["LKHV","Hořovice",49.8481,13.8935],["LKJA","Jaroměř",50.3314,15.9539],["LKJC","Jičín",50.43,15.3331],["LKJH","Jindřichův Hradec",49.15068,14.97241],["LKJI","Jihlava",49.4194,15.6353],["LKKA","Křižanov",49.3683,16.1161],["LKKB","Prague–Kbely Air Base",50.1214,14.5436],["LKKC","Kříženec Planá",49.8706,12.7725],["LKKL","Kladno",50.1128,14.0897],["LKKM","Kroměříž",49.2856,17.4158],["LKKO","Kolín",50.0019,15.1733],["LKKR","Krnov",50.07441,17.69522],["LKKT","Klatovy Josef Hubáč",49.4183,13.3219],["LKKU","Kunovice",49.0294,17.4397],["LKKV","Karlovy Vary",50.203,12.915],["LKKY","Kyjov",48.98,17.1247],["LKLB","Liberec",50.76705,15.02307],["LKLN","Plzeň-Líně",49.6752,13.2746],["LKLT","Letňany",50.1314,14.5256],["LKMB","Mladá Boleslav",50.3983,14.8983],["LKMH","Mnichovo Hradiště",50.5402,15.0066],["LKMI","Mikulovice",50.3017,17.2975],["LKMK","Moravská Třebová",49.7983,16.6878],["LKMO","Most",50.525,13.6831],["LKMT","Leoš Janáček Ostrava",49.6963,18.1111],["LKNA","Náměšť Air Base",49.16627,16.12398],["LKNM","Nové Město nad Metují",50.3642,16.1136],["LKNY","Nymburk",50.1691,15.05245],["LKOL","Olomouc",49.58771,17.20928],["LKZL","Zlín Otrokovice",49.1983,17.5178],["LKPA","Polička",49.7394,16.2589],["LKPC","Panensky Tynec",50.3061,13.9342],["LKPD","Pardubice",50.01505,15.73981],["LKPI","Přibyslav",49.5808,15.7628],["LKPJ","Prostějov",49.4478,17.1339],["LKPL","Letkov",49.7231,13.4522],["LKPM","Příbram",49.7201,14.1006],["LKPN","Podhořany",49.9392,15.5497],["LKPO","Přerov Air Base",49.4258,17.4047],["LKPR","Václav Havel Prague",50.10087,14.25991],["LKPS","Plasy Rybnice",49.9203,13.3769],["LKRA","Rana Loumy",50.4039,13.7519],["LKRK","Rakovnik",50.0942,13.6889],["LKRO","Roudnice nad Labem",50.41019,14.22708],["LKRY","Rokycany",49.75194,13.58972],["LKSA","Staňkov",49.56652,13.04867],["LKSB","Stichovice Pluml",49.48739,17.05261],["LKSK","Skuteč",49.8278,16.0058],["LKSN","Slaný",50.21639,14.08784],["LKSO","Soběslav",49.2455,14.71299],["LKSR","Prachatice",49.0825,14.0758],["LKST","Strakonice",49.2517,13.8928],["LKSU","Šumperk",49.9606,17.0178],["LKSZ","Sazená",50.3247,14.2589],["LKTA","Tábor",49.3911,14.7083],["LKTB","Brno-Tuřany",49.15128,16.69397],["LKTC","Točná",49.98544,14.42647],["LKTD","Tachov",49.79722,12.70717],["LKTO","Toužim",50.0864,12.9528],["LKUL","Usti Nad Labem",50.6997,13.9697],["LKUO","Ústí Nad Orlicí",49.9786,16.4264],["LKVL","Vlašim",49.7289,14.8789],["LKVM","Vysoké Mýto",49.9281,16.18503],["LKVO","Vodochody",50.2166,14.3958],["LKVP","Velké Poříčí",50.4678,16.2056],["LKVR","Vrchlabí",50.6242,15.6464],["LKVY","Letiště Vyškov",49.3003,17.0253],["LKZA","Zábřeh Dolní Benešov",49.92826,18.07556],["LKZB","Zbraslavice",49.8142,15.2017],["LKZD","Žatec-Macerka",50.3175,13.5128],["LKZM","Žamberk",50.0839,16.4439],["LKZN","Znojmo",48.81774,16.06583],["LOAA","Ottenschlag",48.41856,15.21529],["LOAB","Dobersberg",48.92211,15.29683],["LOAG","Krems/Langenlois",48.44615,15.63501],["LOAR","Altlichtenwarth Gliderfield",48.6661,16.825],["LOAU","Stockerau",48.40912,16.19102],["LOLE","Eferding",48.33879,13.98521],["LOLF","Freistadt",48.51375,14.40658],["LOLK","Ried-Kirchheim",48.21227,13.34568],["LOLO","Linz-East Glider Field",48.30004,14.33361],["LOLS","Schärding-Suben",48.4033,13.4483],["LOWL","Linz-Hörsching",48.23536,14.18813],["LOXT","Brumowski  Air Base",48.31925,16.11402],["LZDB","Slávnica-Dubnica nad Váhom",48.9969,18.1922],["LZDV","Dubová Airstrip",48.34702,17.35658],["LZHL","Holič",48.8103,17.1338],["LZMA","Martin",49.0653,18.9508],["LZMC","Malacky/Kuchyňa Air Base",48.402,17.1184],["LZNI","Nitra",48.2794,18.1328],["LZPE","Prievidza",48.7661,18.5867],["LZPP","Piešťany",48.6252,17.8284],["LZPT","Male Bielice-Partizánske",48.6192,18.3297],["LZSE","Senica",48.65793,17.32946],["LZSL","Sliač",48.6378,19.1341],["LZTN","Trenčín",48.86517,18.00015],["LZTR","Trnava",48.45196,17.53182],["LZZI","Žilina-Dolný Hričov",49.23329,18.61339],["","Ostrowy  (Łobodno) Highway Strip",50.9483,19.0136],["","Środa Śląska  (Komorniki) Highway Strip",51.1628,16.6686],["EPWC","Świebodzice",50.88034,16.30865],["","Bystrzyca Klodzka",50.30871,16.64591],["","Tworzyjanów Airstrip",50.92283,16.67892],["","Baryt Air Base",51.05553,16.01364],["","Golędzinów Airstrip",51.26275,16.92183],["","Wyszonowice UL",50.78297,17.16175],["","Nysa",50.47157,17.26682],["","Pawłowiczki",50.24463,18.0236],["","Natolin",51.01624,18.75474],["","Stary Wielisław",50.40707,16.56301],["","Wieluń-Olewin",51.21446,18.63168],["","Goczałkowice",49.9524,18.9419],["","Kępno Airstrip",51.32205,17.97273],["","Dębno Airstrip",51.33468,16.51771],["","Święta Katarzyna Airstrip",51.01555,17.10618],["","Wilków Średzki",51.06434,16.6979],["","Podgórze Airstrip",51.34014,16.28043],["","Konopiska Airstrip",50.73958,19.00814],["","Kaczowice",50.69079,17.11031],["","Rzędów Airstrip",50.75962,18.12882],["","Bojszowy Airstrip",50.04975,19.09411],["","Boronów",50.68065,18.9154],["","Lipowa Airstrip",50.73297,17.4242],["EPLP","Lipowa",49.69775,19.09678],["","Kuźnia Raciborska Firefighting Airstrip",50.22124,18.32237],["","Zielone Zacisze",50.37751,16.54321],["","Krzywina",50.71386,17.16418],["LZDN","Dobra Niva airfield",48.48872,19.10175],["","Košťany nad Turcom Airstrip",49.01676,18.8951],["","Krakovany",48.63389,17.73222],["","Trnava-Kopánka",48.4,17.61167],["","Gajary Airstrip",48.44839,16.93886],["","Čab Airstrip",48.38881,18.00436],["","Bojná Airstrip",48.5419,18.0526],["","Ludanice Airstrip",48.50968,18.13203],["","Rybany Airstrip",48.66609,18.22807],["","Morovno Airstrip",48.76075,18.74258],["","Prusy Airstrip",48.74736,18.26312],["","Šalgovce-Orešany Airstrip",48.50853,17.92236],["","Hontianske Nemce Airstrip",48.26196,19.009],["","Janova Lehota Airstrip",48.63759,18.79713],["","Pliešovce Airstrip",48.41835,19.14903],["","Tužina Airstrip",48.89307,18.62502],["","Domaniža",49.05172,18.5534],["","Dlžín Airstrip",48.80448,18.50672],["","Dolná Štubňa Airstrip",48.83481,18.84362],["","Vankovia Airstrip",48.76409,17.5268],["","Nevoľné Airstrip",48.66809,18.93495],["","Nemčice-Topoľčany Airstrip",48.54662,18.14393],["","Senec Airstrip",48.2502,17.39874]];
+function nearbyAD(p,maxNM){
+  return AD.map(a=>({code:a[0],name:a[1],lat:a[2],lon:a[3],d:gDist(p,{lat:a[2],lon:a[3]})}))
+    .filter(a=>a.d<=maxNM).sort((a,b)=>a.d-b.d);
+}
+const adLabel = a => (a.code? a.code+' ':'')+a.name.replace(/\s+(ULM|UL|Airstrip|Airport)$/i,'');
+const geoCache = LS.get('geoCache',{});
+let geoLast=0;
+async function reverseGeo(p){
+  const k=p.lat.toFixed(4)+','+p.lon.toFixed(4); if(geoCache[k]!==undefined) return geoCache[k];
+  const wait=Math.max(0,geoLast+1100-Date.now()); if(wait) await new Promise(r=>setTimeout(r,wait)); geoLast=Date.now();
+  const r=await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=14&accept-language=cs&lat=${p.lat}&lon=${p.lon}`);
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  const j=await r.json(), a=j.address||{};
+  const name=a.village||a.town||a.city||a.hamlet||a.suburb||a.municipality||null;
+  geoCache[k]=name; LS.set('geoCache',geoCache); return name;
+}
+function renamePoint(i,name){
+  name=(name||'').trim().replace(/\s+/g,' ').slice(0,28); if(!name) return;
+  S.route.pts[i].name=name; LS.set('route',S.route);
+  renderLegs(); updateNav(); requestRender(); updateStartInfo();
+}
+let dlgIdx=-1;
+function openNameDlg(i){
+  dlgIdx=i; const p=S.route.pts[i];
+  $('nameTitle').textContent=`Bod ${i+1} z ${S.route.pts.length}`;
+  $('nameCoord').textContent=`${fmtLL(p.lat,'N','S')}  ${fmtLL(p.lon,'E','W')}`;
+  $('nameIn').value=p.name;
+  $('spdRow').style.display=i>0?'flex':'none'; $('legSpd').placeholder=Math.round(sV(S.cfg.tas)); $('legSpd').value=p.spd?Math.round(sV(p.spd)):'';
+  document.querySelectorAll('#spdRow .uS').forEach(e=>e.textContent=sU());
+  const sug=$('nameSug'); sug.innerHTML='';
+  const add=(label,sub)=>{ const b=document.createElement('button'); b.innerHTML=esc(label)+(sub?`<small>${esc(sub)}</small>`:''); b.onclick=()=>{$('nameIn').value=label;}; sug.appendChild(b); };
+  nearbyAD(p,5).slice(0,4).forEach(a=>add(adLabel(a), `letiště · ${fD(a.d,1)} ${dU()}`));
+  const ph=document.createElement('div'); ph.className='c'; ph.textContent='Hledám nejbližší obec…'; sug.appendChild(ph);
+  reverseGeo(p).then(n=>{ ph.remove(); if(n) add(n,'nejbližší obec (OSM)'); })
+               .catch(()=>{ ph.textContent='Obec nelze dohledat (offline).'; });
+  $('nameDlg').style.display='flex'; setTimeout(()=>{$('nameIn').focus();$('nameIn').select();},50);
+}
+const fmtLL=(v,pos,neg)=>{ const a=Math.abs(v), d=Math.floor(a), m=(a-d)*60; return `${d}°${m.toFixed(2).padStart(5,'0')}′${v>=0?pos:neg}`; };
+$('nameCancel').onclick=()=>{$('nameDlg').style.display='none';};
+$('nameOk').onclick=()=>{ const p=S.route.pts[dlgIdx], v=parseFloat($('legSpd').value);
+  if(dlgIdx>0){ if(v>0) p.spd=Math.max(30,fromS(v)); else delete p.spd; }
+  renamePoint(dlgIdx,$('nameIn').value); $('nameDlg').style.display='none'; };
+$('nameIn').addEventListener('keydown',e=>{ if(e.key==='Enter') $('nameOk').click(); });
+async function suggestAll(){
+  const pts=S.route.pts; let ad=0, town=0, fail=0;
+  progress('Navrhuji názvy bodů…',0);
+  for(let i=0;i<pts.length;i++){
+    const p=pts[i]; if(!/^(WP|TP)\d+$/.test(p.name)) continue;   // ručně pojmenované nech být
+    const a=nearbyAD(p,1.5)[0];
+    if(a){ p.name=adLabel(a); ad++; }
+    else { try{ const n=await reverseGeo(p); if(n){ p.name=n; town++; } else fail++; }catch(e){ fail++; } }
+    progress(`Navrhuji názvy bodů… ${i+1} / ${pts.length}`,(i+1)/pts.length);
+  }
+  progress(null); LS.set('route',S.route); renderLegs(); updateNav(); requestRender(); updateStartInfo();
+  showBanner(`Letiště: ${ad} · obce: ${town}${fail?` · bez návrhu: ${fail} (offline?)`:''} – zkontroluj podle mapy, ✎ upraví`,'info',7000);
+}
+function exportGPX(){
+  const x=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const g=`<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="PPL Nav" xmlns="http://www.topografix.com/GPX/1/1">\n  <rte>\n    <name>${x(S.route.name)}</name>\n`+
+    S.route.pts.map(p=>`    <rtept lat="${p.lat.toFixed(5)}" lon="${p.lon.toFixed(5)}"><name>${x(p.name)}</name></rtept>`).join('\n')+`\n  </rte>\n</gpx>\n`;
+  const fname=(S.route.name||'trasa').replace(/[^\w\-]+/g,'_')+'.gpx';
+  const file=new File([g],fname,{type:'application/gpx+xml'});
+  if (navigator.canShare && navigator.canShare({files:[file]})) { navigator.share({files:[file],title:fname}).catch(()=>{}); return; }
+  const a=document.createElement('a'); a.href=URL.createObjectURL(file); a.download=fname; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1000);
+}
+
+/* ================= start / file ================= */
+function updateStartInfo(){
+  const el=$('routeinfo');
+  if(!S.route){ el.textContent='Zatím není nahraná žádná trasa.'; return; }
+  const pts=S.route.pts; let tot=0; for(let i=1;i<pts.length;i++) tot+=gDist(pts[i-1],pts[i]);
+  el.textContent=`${S.route.name}: ${pts.length} bodů, ${fD(tot,1)} ${dU()} (${pts[0].name} → ${pts[pts.length-1].name})`;
+}
+const fileIn=$('file');
+$('bLoad').onclick=$('bLoad2').onclick=()=>fileIn.click();
+fileIn.onchange=async()=>{
+  const f=fileIn.files[0]; if(!f) return;
+  try{ setRoute(parseGPX(await f.text())); const generic=S.route.pts.every(p=>/^(WP|TP)\d+$/.test(p.name));
+    showBanner(generic? 'Trasa načtena · body pojmenuješ v Trasa › Navrhnout názvy / ✎' : 'Trasa načtena: '+S.route.pts.length+' bodů','info',generic?7000:3000); }
+  catch(err){ $('routeinfo').textContent='Chyba: '+err.message; showBanner('Chyba GPX: '+err.message,'bad',6000); }
+  fileIn.value='';
+};
+$('bGo').onclick=()=>{
+  if(!S.route){ $('routeinfo').textContent='Nejdřív nahraj GPX soubor s trasou.'; return; }
+  $('start').style.display='none'; S.started=true;
+  try{ actx=new (window.AudioContext||window.webkitAudioContext)(); actx.resume(); }catch(e){}
+  if('speechSynthesis' in window && S.cfg.voice){ speak('Navigace spuštěna. Další bod '+spoken(S.route.pts[S.active].name)); }
+  keepAwake(); startGPS(); renderLegs(); resize(); updateNav();
+};
+
+/* ================= init ================= */
+window.addEventListener('resize',resize);
+{ const v=$('appVer'); if(v.textContent.startsWith('__')) v.textContent='dev (lokální)'; }
+bindSettings(); chartInfo(); showOrient(false); resize(); if(S.route){ fitRoute(); } updateStartInfo(); renderLegs(); updateNav(); requestRender();
+if('serviceWorker' in navigator && location.protocol==='https:'){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
+// test hook
+window.__PPL = { S, nearbyAD, renamePoint, parseGPX, setRoute, legGeom, gDist, gBrg, onFix, CHART, importMBTiles };
+</script>
+</body>
+</html>

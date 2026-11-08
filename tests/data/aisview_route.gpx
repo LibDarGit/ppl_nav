@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="aisview.rlp.cz" xmlns="http://www.topografix.com/GPX/1/1">
+  <rte>
+    <name>AISVIEW route</name>
+    <rtept lat="50.41622" lon="15.83778"><name>WP01</name></rtept>
+    <rtept lat="50.51609" lon="15.22703"><name>WP02</name></rtept>
+    <rtept lat="50.55283" lon="15.55092"><name>WP03</name></rtept>
+    <rtept lat="50.70928" lon="15.42612"><name>WP04</name></rtept>
+    <rtept lat="50.62005" lon="15.55861"><name>WP05</name></rtept>
+    <rtept lat="50.61480" lon="15.64260"><name>WP06</name></rtept>
+    <rtept lat="50.58326" lon="16.33698"><name>WP07</name></rtept>
+    <rtept lat="50.52877" lon="16.05249"><name>WP08</name></rtept>
+    <rtept lat="50.41639" lon="16.15516"><name>WP09</name></rtept>
+    <rtept lat="50.42542" lon="15.87704"><name>WP10</name></rtept>
+  </rte>
+</gpx>
