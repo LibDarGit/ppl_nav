@@ -43,6 +43,18 @@ canvas#map{position:absolute;inset:0;width:100%;height:100%;display:block}
 #banner.bad{display:block;background:var(--bad);color:#fff}
 #banner.flash{animation:fl 1s steps(2,start) infinite}
 @keyframes fl{50%{opacity:.55}}
+/* vzdušné prostory: trvalý pruh (uvnitř / před námi) a okno po klepnutí do mapy */
+#aspWarn{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);max-width:80%;padding:8px 14px;border-radius:10px;
+  font-size:17px;font-weight:700;display:none;box-shadow:0 4px 18px rgba(0,0,0,.4);text-align:center}
+#aspWarn.ahead{display:block;background:var(--warn);color:#111}
+#aspWarn.in{display:block;background:#1f5fd6;color:#fff}
+#aspWarn.in.alert{background:var(--bad)}
+#aspWarn small{display:block;font-size:13px;font-weight:600;opacity:.85}
+#aspPop{position:absolute;left:10px;top:52px;max-width:min(440px,70%);max-height:60%;overflow:auto;padding:10px 12px;border-radius:12px;
+  background:rgba(17,26,46,.94);border:1px solid var(--line);font-size:14px;display:none;z-index:5}
+#aspPop.open{display:block}
+#aspPop div{padding:4px 0;border-bottom:1px solid var(--line)} #aspPop div:last-child{border-bottom:0}
+#aspPop b{font-size:15px} #aspPop small{color:var(--dim)}
 .mbtns{position:absolute;right:10px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:10px}
 .mbtn{width:56px;height:56px;border-radius:14px;border:1px solid var(--line);background:rgba(17,26,46,.88);
   color:var(--txt);font-size:24px;font-weight:700;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px)}
@@ -130,6 +142,8 @@ input[type=file]{display:none}
     <canvas id="map"></canvas>
     <div id="gpsinfo"><i></i><span id="gpsTxt">GPS: čekám</span></div>
     <div id="banner"></div>
+    <div id="aspWarn"></div>
+    <div id="aspPop"></div>
     <div class="mbtns">
       <button class="mbtn" id="bZin">+</button>
       <button class="mbtn" id="bZout">−</button>
@@ -150,6 +164,18 @@ input[type=file]{display:none}
           <div style="display:flex;gap:8px"><button class="b" id="bChart">Nahrát .mbtiles</button><button class="b" id="bChartDel">Smazat</button></div></div>
         <div class="row">Okolí mimo mapu ICAO doplnit OpenTopoMap
           <input id="sUnder" type="checkbox"></div>
+        <div class="row">Vzdušné prostory (openAIP)
+          <input id="sAsp" type="checkbox"></div>
+        <div class="row" style="flex-wrap:wrap"><div>Data prostorů<div class="d" id="aspInfo" style="font-size:13px;color:var(--dim)">nestažená</div></div>
+          <div style="display:flex;gap:8px"><button class="b" id="bAspGet">Stáhnout</button><button class="b" id="bAspDel">Smazat</button></div></div>
+        <div class="row"><span>API klíč openAIP</span>
+          <input id="aspKey" type="password" autocomplete="off" spellcheck="false" placeholder="z openaip.net › API Clients" style="width:200px"></div>
+        <div class="row"><span>Země (kódy ISO)</span>
+          <input id="aspCountries" type="text" autocapitalize="characters" spellcheck="false" style="width:150px"></div>
+        <div class="row"><span>Zobrazit prostory s dolní hranicí do (ft)</span>
+          <input id="sAspMax" type="number" step="500" min="1000"></div>
+        <div class="row"><span>Varovat před vstupem (min předem)</span>
+          <input id="sAspLook" type="number" step="1" min="0" max="10"></div>
         <div class="row">Kurzy
           <select id="sMag"><option value="1">Magnetické (°M)</option><option value="0">Zeměpisné (°T)</option></select></div>
         <div class="row">Vzdálenost
@@ -176,8 +202,11 @@ input[type=file]{display:none}
         <div class="note">Mapové dlaždice se ukládají do paměti iPadu jen v místech, která si na mapě prohlédneš.
           Před letem si proto trasu na zemi s internetem projeď (posun/zoom podél trati), v letu pak mapa funguje i bez signálu.
           Navigace (body, kurzy, vzdálenosti, CDI) funguje offline vždy.<br><br>
-          Mapa © přispěvatelé OpenStreetMap, styl OpenTopoMap (CC-BY-SA). Mapa ICAO © ŘLP ČR, s.p. – vlastní soubor uživatele. Seznam letišť: OurAirports (public domain). Názvy obcí: Nominatim / © OpenStreetMap.<br><br>
-          Pomocná navigační pomůcka, není certifikovaná. Nezobrazuje vzdušné prostory ani NOTAM.<br><br>Verze aplikace: <span id="appVer">__BUILD__</span></div>
+          Mapa © přispěvatelé OpenStreetMap, styl OpenTopoMap (CC-BY-SA). Mapa ICAO © ŘLP ČR, s.p. – vlastní soubor uživatele. Seznam letišť: OurAirports (public domain). Názvy obcí: Nominatim / © OpenStreetMap.
+          Vzdušné prostory: <a href="https://www.openaip.net" target="_blank" rel="noopener" style="color:var(--txt)">openAIP</a> (CC BY-NC 4.0).<br><br>
+          Klepnutím do mapy zobrazíš prostory v daném místě. Data openAIP jsou komunitní a nemusí být aktuální. Výšky nad terénem (AGL)
+          aplikace neumí přepočítat, varuje proto s rezervou. Aktivaci TRA/TSA, prostorů R/D a NOTAM ověř před letem v AisView.<br><br>
+          Pomocná navigační pomůcka, není certifikovaná. Nezobrazuje NOTAM ani aktuální aktivaci prostorů.<br><br>Verze aplikace: <span id="appVer">__BUILD__</span></div>
       </div>
     </div>
   </div>
@@ -266,7 +295,8 @@ const S = {
   hist: [], lastRaw: null,
   view: { lat: 50.5, lon: 15.6, z: 10, rot: 0 },
   follow: true,
-  cfg: Object.assign({ map:'otm', underlay:true, du:'nm', su:'kt', orient:'trk', wd:0, wdSet:false, ws:0, dep:'', mag:true, variation:5.3, seq:0.5, cdi:2, tas:90, voice:true, night:false, sim:false, simKt:100 }, LS.get('cfg',{})),
+  cfg: Object.assign({ map:'otm', underlay:true, du:'nm', su:'kt', orient:'trk', wd:0, wdSet:false, ws:0, dep:'', mag:true, variation:5.3, seq:0.5, cdi:2, tas:90, voice:true, night:false, sim:false, simKt:100,
+                      asp:true, aspMaxFt:9500, aspLook:3, aspCountries:'CZ' }, LS.get('cfg',{})),
   announced: {}, started: false
 };
 const saveNav = () => { LS.set('active',S.active); LS.set('directFrom',S.directFrom); };
@@ -369,6 +399,11 @@ function toScreen(lat,lon){
   const dx=p.x-c.x, dy=p.y-c.y, r=-S.view.rot*D2R, cs=Math.cos(r), sn=Math.sin(r);
   return { x:a.x+dx*cs-dy*sn, y:a.y+dx*sn+dy*cs };
 }
+function fromScreen(x,y){
+  const z=S.view.z, c=proj(S.view.lat,S.view.lon,z), a=anchor(), r=S.view.rot*D2R, cs=Math.cos(r), sn=Math.sin(r);
+  const dx=x-a.x, dy=y-a.y;
+  return unproj(c.x+dx*cs-dy*sn, c.y+dx*sn+dy*cs, z);
+}
 let renderPending=false;
 function requestRender(){ if(!renderPending){renderPending=true;requestAnimationFrame(render);} }
 function render(){
@@ -391,6 +426,7 @@ function render(){
     if(night){ ctx.fillStyle='rgba(5,10,25,.62)'; ctx.fillRect(0,0,MW,MH); }
     else { ctx.fillStyle='rgba(255,255,255,.12)'; ctx.fillRect(0,0,MW,MH); }
   }
+  drawAirspaces(ctx,a);
   // breadcrumb
   if (S.hist.length>1){
     ctx.beginPath(); S.hist.forEach((p,i)=>{const s=toScreen(p.lat,p.lon); i?ctx.lineTo(s.x,s.y):ctx.moveTo(s.x,s.y);});
@@ -622,7 +658,7 @@ function onFix(lat,lon,alt,speedMs,headingDeg,acc,t){
   S.pos=p; S.alt=alt; S.acc=acc; S.fixTime=Date.now();
   const lh=S.hist[S.hist.length-1];
   if(!lh || gDist(lh,p)>0.05){ S.hist.push(p); if(S.hist.length>3000) S.hist.shift(); }
-  updateNav(); requestRender(); gpsStatus();
+  updateNav(); aspCheck(); requestRender(); gpsStatus();
 }
 function startGPS(){
   stopGPS();
@@ -673,16 +709,23 @@ function panBy(dx,dy){
 }
 function setFollow(f){ S.follow=f; $('bFollow').classList.toggle('on',f); requestRender(); }
 function zoomBy(dz){ S.view.z=Math.max(5,Math.min(16,S.view.z+dz)); requestRender(); }
-mapCv.addEventListener('pointerdown',e=>{ mapCv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY}); pinch0=null; });
+let tap=null; // klepnutí bez posunu → informace o prostorech v místě
+mapCv.addEventListener('pointerdown',e=>{ mapCv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY}); pinch0=null;
+  tap = ptrs.size===1 ? {x:e.clientX,y:e.clientY,t:Date.now()} : null; });
 mapCv.addEventListener('pointermove',e=>{
   const p=ptrs.get(e.pointerId); if(!p) return;
+  if (tap && Math.hypot(e.clientX-tap.x,e.clientY-tap.y)>8) tap=null;
   if(ptrs.size===1){ const dx=e.clientX-p.x, dy=e.clientY-p.y; if(Math.abs(dx)+Math.abs(dy)>0){ if(S.follow){ if(Math.hypot(dx,dy)<6) return; setFollow(false);} panBy(dx,dy); requestRender(); } }
   p.x=e.clientX; p.y=e.clientY;
   if(ptrs.size===2){ const [a,b]=[...ptrs.values()], d=Math.hypot(a.x-b.x,a.y-b.y);
     if(pinch0) { S.view.z=Math.max(5,Math.min(16,S.view.z+Math.log2(d/pinch0))); requestRender(); } pinch0=d; }
 });
 const up=e=>{ ptrs.delete(e.pointerId); pinch0=null; };
-mapCv.addEventListener('pointerup',up); mapCv.addEventListener('pointercancel',up);
+mapCv.addEventListener('pointerup',e=>{
+  const t=tap; up(e); tap=null;
+  if (t && e.type==='pointerup' && Date.now()-t.t<600){ const r=mapCv.getBoundingClientRect(); aspIdentify(fromScreen(e.clientX-r.left,e.clientY-r.top)); }
+});
+mapCv.addEventListener('pointercancel',e=>{ tap=null; up(e); });
 mapCv.addEventListener('wheel',e=>{ e.preventDefault(); zoomBy(-e.deltaY/300); },{passive:false});
 $('bZin').onclick=()=>zoomBy(0.5); $('bZout').onclick=()=>zoomBy(-0.5);
 $('bFollow').onclick=()=>setFollow(!S.follow);
@@ -823,22 +866,31 @@ function bindSettings(){
   $('sSim').onchange=e=>{c.sim=e.target.checked; S.hist=[]; S.lastRaw=null; S.gs=null; S.trk=null; S.pos=null; S.fixTime=0; save(); if(S.started) startGPS();};
   $('sSimKt').onchange=e=>{c.simKt=Math.max(40,inS(parseFloat(e.target.value))||100);save();fillUnits();};
   $('bClearTrk').onclick=()=>{S.hist=[];requestRender();};
+  $('sAsp').checked=c.asp; $('sAspMax').value=c.aspMaxFt; $('sAspLook').value=c.aspLook;
+  $('aspKey').value=LS.get('aspKey',''); $('aspCountries').value=c.aspCountries;
+  $('sAsp').onchange=e=>{c.asp=e.target.checked; save(); aspCheck(); if(!c.asp) $('aspPop').className='';};
+  $('sAspMax').onchange=e=>{c.aspMaxFt=Math.max(1000,parseFloat(e.target.value)||9500); e.target.value=c.aspMaxFt; save(); aspCheck();};
+  $('sAspLook').onchange=e=>{const v=parseFloat(e.target.value); c.aspLook=isFinite(v)? Math.max(0,Math.min(10,v)) : 3; e.target.value=c.aspLook; save(); aspCheck();};
+  $('aspKey').onchange=e=>LS.set('aspKey',e.target.value.trim());
+  $('aspCountries').onchange=e=>{c.aspCountries=aspCountryList(e.target.value).join(',')||'CZ'; e.target.value=c.aspCountries; LS.set('cfg',c);};
 }
 
 
 /* ================= vlastní mapa ICAO: MBTiles -> IndexedDB ================= */
-const CHART = { meta: LS.get('chartMeta', null), db: null };
-function chartDB(){
-  if (CHART.db) return Promise.resolve(CHART.db);
-  return new Promise((res,rej)=>{ const r=indexedDB.open('pplnav-chart',1);
-    r.onupgradeneeded=()=>r.result.createObjectStore('tiles');
-    r.onsuccess=()=>{CHART.db=r.result;res(r.result);}; r.onerror=()=>rej(r.error); });
+// IndexedDB s jedním úložištěm (store); databáze se otevře při prvním použití
+function idbStore(name,store){
+  let db=null;
+  const open=()=> db? Promise.resolve(db) : new Promise((res,rej)=>{ const r=indexedDB.open(name,1);
+    r.onupgradeneeded=()=>r.result.createObjectStore(store);
+    r.onsuccess=()=>{db=r.result;res(db);}; r.onerror=()=>rej(r.error); });
+  return (mode,fn)=>open().then(d=>new Promise((res,rej)=>{
+    const tx=d.transaction(store,mode), st=tx.objectStore(store); let out; const r=fn(st);
+    if (r) r.onsuccess=()=>{out=r.result;};
+    tx.oncomplete=()=>res(out); tx.onerror=()=>rej(tx.error); tx.onabort=()=>rej(tx.error||new Error('abort'));
+  }));
 }
-function chartTx(mode,fn){ return chartDB().then(db=>new Promise((res,rej)=>{
-  const tx=db.transaction('tiles',mode), st=tx.objectStore('tiles'); let out; const r=fn(st);
-  if (r) r.onsuccess=()=>{out=r.result;};
-  tx.oncomplete=()=>res(out); tx.onerror=()=>rej(tx.error); tx.onabort=()=>rej(tx.error||new Error('abort'));
-})); }
+const CHART = { meta: LS.get('chartMeta', null) };
+const chartTx = idbStore('pplnav-chart','tiles');
 const chartGet = k => chartTx('readonly', st=>st.get(k));
 const chartPut = list => chartTx('readwrite', st=>{ for(const [k,v] of list) st.put(v,k); });
 const chartClear = () => chartTx('readwrite', st=>st.clear());
@@ -896,6 +948,199 @@ const chartIn=$('chartFile');
 $('bChart').onclick=()=>chartIn.click();
 chartIn.onchange=()=>{ const f=chartIn.files[0]; chartIn.value=''; if(f) importMBTiles(f); };
 $('bChartDel').onclick=async()=>{ await chartClear().catch(()=>{}); CHART.meta=null; LS.set('chartMeta',null); tileCache.clear(); chartInfo(); requestRender(); };
+
+
+/* ================= vzdušné prostory: openAIP -> IndexedDB ================= */
+// Data: openAIP Core API (CC BY-NC 4.0), stažená na zemi s vlastním API klíčem uživatele, v letu offline.
+const ASP = { list: [], meta: LS.get('aspMeta', null), said: new Map() };
+const aspTx = idbStore('pplnav-asp','data');
+const OAIP_URL = 'https://api.core.openaip.net/api/airspaces';
+const ASP_ABBR = {1:'R',2:'D',3:'P',4:'CTR',5:'TMZ',6:'RMZ',7:'TMA',8:'TRA',9:'TSA',13:'ATZ',14:'MATZ',20:'HTZ',21:'GLD',23:'TIZ',24:'TIA',
+                  25:'MTA',26:'CTA',28:'SPORT',30:'MRT',34:'LTA',36:'MCTR'};
+const ASP_CLASS = {0:'A',1:'B',2:'C',3:'D',4:'E',5:'F',6:'G'};
+const ASP_HIDE  = new Set([10,11,15,27,33,35]);                  // FIR, UIR, airway, ACC, FIS, UTA – jen by zahltily mapu
+const ASP_ALERT = new Set([1,2,3,4,5,6,7,8,9,13,14,26,36]);      // před vstupem do těchto se varuje
+const ASP_ACTIVATED = new Set([1,2,8,9,25]);                     // R, D, TRA, TSA, MTA – aktivace podle AUP/NOTAM
+const aspCountryList = s => [...new Set(String(s||'').toUpperCase().split(/[\s,;]+/).filter(c=>/^[A-Z]{2}$/.test(c)))];
+
+// Výšková mez → přibližně ft MSL. Terén neznáme: AGL dolní mez beru jako MSL (nižší → varuje dřív),
+// AGL horní mez navyšuji o 3000 ft (výše položený terén v ČR) – obojí ve prospěch bezpečnosti.
+function limFt(l,upper){
+  if (!l) return upper? 1e6 : 0;
+  const v = l.u===6? l.v*100 : l.u===0? l.v*3.28084 : l.v;
+  return (l.r===0 && upper)? v+3000 : v;
+}
+function fmtLim(l){
+  if (!l) return '?';
+  if (l.r===0 && l.v===0) return 'GND';
+  if (l.u===6) return 'FL'+l.v;
+  return `${l.v} ${l.u===0?'m':'ft'} ${l.r===0?'AGL':'MSL'}`;
+}
+function aspLabel(A){ const ab=ASP_ABBR[A.t]; return (ab && !A.n.toUpperCase().startsWith(ab))? ab+' '+A.n : A.n; }
+const aspLimits = A => `${fmtLim(A.lo)} – ${fmtLim(A.hi)}`;
+const ABBRS = new Set(Object.values(ASP_ABBR));
+function aspSpoken(A){ // „CTR PARDUBICE“ → „C T R Pardubice“, „LKR10“ → „L K R 10“, aby to hlas nečetl jako slovo
+  const spell = s => s.split('').join(' ');
+  return aspLabel(A).split(/\s+/).map(w=>
+    ABBRS.has(w)? spell(w) : /^[A-Z]+\d+[A-Z]?$/.test(w)? w.replace(/^[A-Z]+/,m=>spell(m)+' ')
+    : w.length>1? w[0]+w.slice(1).toLocaleLowerCase('cs') : w).join(' ');
+}
+
+function aspSlim(it){
+  const ring = it.geometry && it.geometry.type==='Polygon' && it.geometry.coordinates && it.geometry.coordinates[0];
+  if (!Array.isArray(ring) || ring.length<4) return null;
+  const L = l => l && isFinite(l.value)? {v:l.value,u:l.unit,r:l.referenceDatum} : null;
+  return { id:String(it._id||''), n:String(it.name||'?').trim(), t:it.type|0, c:it.icaoClass,
+           lo:L(it.lowerLimit), hi:L(it.upperLimit), g:ring.map(p=>[+p[0],+p[1]]),
+           act:!!(it.onDemand||it.onRequest||it.byNotam) };
+}
+// odvozené údaje pro vykreslení a hledání (neukládají se)
+function aspPrepare(list){
+  for (const A of list){
+    let b=[180,90,-180,-90];
+    for (const [lon,lat] of A.g){ b=[Math.min(b[0],lon),Math.min(b[1],lat),Math.max(b[2],lon),Math.max(b[3],lat)]; }
+    A.bb=b; A.w=A.g.map(([lon,lat])=>proj(lat,lon,0));
+    const p0=proj(b[3],b[0],0), p1=proj(b[1],b[2],0); A.wb=[p0.x,p0.y,p1.x,p1.y]; A.area=(p1.x-p0.x)*(p1.y-p0.y);
+  }
+  return list.sort((a,b)=>b.area-a.area); // velké dospod, malé (CTR, P) navrch
+}
+function aspInfo(){
+  const m=ASP.meta;
+  $('aspInfo').textContent = m? `${m.count} prostorů · ${m.countries.join(', ')} · staženo ${new Date(m.date).toLocaleDateString('cs-CZ')}` : 'nestažená';
+}
+async function aspLoad(){
+  if (!ASP.meta) return;
+  try{
+    const l=await aspTx('readonly',st=>st.get('list'));
+    if (!l || !l.length){ ASP.meta=null; LS.set('aspMeta',null); aspInfo(); return; } // iOS může úložiště vyčistit
+    ASP.list=aspPrepare(l); aspCheck(); requestRender();
+  }catch(e){}
+}
+async function aspDownload(){
+  const key=$('aspKey').value.trim(), countries=aspCountryList($('aspCountries').value);
+  if (!key){ showBanner('Zadej API klíč openAIP (openaip.net › profil › API Clients)','warn',6000); return; }
+  if (!countries.length){ showBanner('Zadej kódy zemí, např. CZ, SK','warn',5000); return; }
+  LS.set('aspKey',key); S.cfg.aspCountries=countries.join(','); LS.set('cfg',S.cfg);
+  progress('Stahuji vzdušné prostory…',0);
+  try{
+    const byId=new Map();
+    for (const [ci,cc] of countries.entries()){
+      for (let page=1; page; ){
+        let r;
+        try{ r=await fetch(`${OAIP_URL}?country=${cc}&limit=1000&page=${page}`,{headers:{'x-openaip-api-key':key,'Accept':'application/json'}}); }
+        catch(e){ throw new Error('openAIP není dostupný (jsi online?)'); }
+        if (r.status===401||r.status===403) throw new Error('openAIP odmítl API klíč');
+        if (r.status===429) throw new Error('openAIP omezil počet požadavků, zkus to za chvíli');
+        if (!r.ok) throw new Error('openAIP vrátil HTTP '+r.status);
+        const j=await r.json(), pages=j.totalPages||1;
+        for (const it of j.items||[]){ const A=aspSlim(it); if (!A) continue; if (!A.id) A.id=`${cc}-${byId.size}`; byId.set(A.id,A); }
+        progress(`Stahuji vzdušné prostory… ${cc} ${page}/${pages}`, (ci+page/pages)/countries.length);
+        page = page<pages? page+1 : 0;
+      }
+    }
+    const list=[...byId.values()];
+    if (!list.length) throw new Error('pro zadané země nejsou v openAIP žádné prostory');
+    await aspTx('readwrite',st=>st.put(list,'list'));
+    try{ navigator.storage && navigator.storage.persist && navigator.storage.persist(); }catch(e){}
+    ASP.list=aspPrepare(list); ASP.said.clear();
+    ASP.meta={count:list.length, countries, date:Date.now()}; LS.set('aspMeta',ASP.meta);
+    if (!S.cfg.asp){ S.cfg.asp=true; LS.set('cfg',S.cfg); $('sAsp').checked=true; }
+    aspInfo(); progress(null); aspCheck(); requestRender();
+    showBanner(`Vzdušné prostory staženy (${list.length})`,'info',4000);
+  }catch(err){
+    progress(null); showBanner('Stažení prostorů selhalo: '+err.message,'bad',8000);
+  }
+}
+$('bAspGet').onclick=aspDownload;
+$('bAspDel').onclick=async()=>{ await aspTx('readwrite',st=>st.clear()).catch(()=>{}); ASP.list=[]; ASP.meta=null; LS.set('aspMeta',null);
+  ASP.said.clear(); aspInfo(); aspCheck(); $('aspPop').className=''; requestRender(); };
+
+function aspStyle(t){
+  if (t===3) return {c:'#d0021b', f:'rgba(208,2,27,.18)', w:2.5, d:[]};               // P
+  if (t===1||t===2) return {c:'#d0021b', f:'rgba(208,2,27,.07)', w:2, d:[9,5]};       // R, D
+  if (t===4||t===36||t===13||t===14) return {c:'#1f5fd6', f:'rgba(31,95,214,.10)', w:2.5, d:[]}; // CTR, ATZ
+  if (t===7||t===26) return {c:'#1f5fd6', f:null, w:1.8, d:[]};                          // TMA, CTA
+  if (t===8||t===9||t===25||t===30||t===16) return {c:'#c06000', f:'rgba(224,112,0,.06)', w:2, d:[11,6]}; // TRA, TSA, MTA
+  if (t===5||t===6) return {c:'#2e7d32', f:null, w:2, d:[4,4]};                          // TMZ, RMZ
+  return {c:'#6b6b6b', f:null, w:1.2, d:[3,5]};
+}
+const aspShown = A => !ASP_HIDE.has(A.t) && limFt(A.lo,false)<=S.cfg.aspMaxFt;
+function drawAirspaces(ctx,a){
+  if (!S.cfg.asp || !ASP.list.length) return;
+  const s=2**S.view.z, c=proj(S.view.lat,S.view.lon,S.view.z), r=-S.view.rot*D2R, cs=Math.cos(r), sn=Math.sin(r);
+  const R=Math.hypot(MW,MH), u0=(c.x-R)/s, u1=(c.x+R)/s, v0=(c.y-R)/s, v1=(c.y+R)/s; // okno kolem výřezu (odolné vůči natočení)
+  ctx.save();
+  for (const A of ASP.list){
+    const b=A.wb; if (b[2]<u0||b[0]>u1||b[3]<v0||b[1]>v1 || !aspShown(A)) continue;
+    const st=aspStyle(A.t); ctx.beginPath();
+    for (let i=0;i<A.w.length;i++){ const dx=A.w[i].x*s-c.x, dy=A.w[i].y*s-c.y, x=a.x+dx*cs-dy*sn, y=a.y+dx*sn+dy*cs; i?ctx.lineTo(x,y):ctx.moveTo(x,y); }
+    ctx.closePath();
+    if (st.f){ ctx.fillStyle=st.f; ctx.fill(); }
+    ctx.setLineDash(st.d); ctx.strokeStyle=st.c; ctx.lineWidth=ASP.said.has(A.id)? st.w+2 : st.w; ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function pointIn(p,g){ // ray casting v lon/lat – na velikost prostorů dostatečné
+  let inside=false;
+  for (let i=0,j=g.length-1;i<g.length;j=i++){
+    const [xi,yi]=g[i], [xj,yj]=g[j];
+    if ((yi>p.lat)!==(yj>p.lat) && p.lon<(xj-xi)*(p.lat-yi)/(yj-yi)+xi) inside=!inside;
+  }
+  return inside;
+}
+const aspAt = (p,list) => list.filter(A=> p.lon>=A.bb[0]&&p.lon<=A.bb[2]&&p.lat>=A.bb[1]&&p.lat<=A.bb[3] && pointIn(p,A.g));
+
+function aspIdentify(p){
+  const el=$('aspPop');
+  if (!S.cfg.asp || !ASP.list.length){ el.className=''; return; }
+  const hit=aspAt(p,ASP.list.filter(A=>!ASP_HIDE.has(A.t))).sort((a,b)=>limFt(a.lo,false)-limFt(b.lo,false));
+  el.innerHTML = hit.length? hit.map(A=>`<div><b>${esc(aspLabel(A))}</b><br>${esc(aspLimits(A))}${ASP_CLASS[A.c]?` · třída ${ASP_CLASS[A.c]}`:''}`+
+      `${ASP_ACTIVATED.has(A.t)||A.act?' <small>· aktivace dle AUP/NOTAM</small>':''}</div>`).join('')
+    : '<div><small>Žádný vzdušný prostor v tomto místě.</small></div>';
+  el.className='open';
+  clearTimeout(aspIdentify.tm); aspIdentify.tm=setTimeout(()=>{el.className='';},10000);
+}
+$('aspPop').onclick=()=>{ $('aspPop').className=''; };
+
+// Prostor ve výšce letu? Bez výšky z GPS: všechny se zobrazenou dolní hranicí.
+function aspVert(A){
+  if (S.alt==null) return limFt(A.lo,false)<=S.cfg.aspMaxFt;
+  const ft=S.alt*3.28084;
+  return ft>=limFt(A.lo,false)-300 && ft<=limFt(A.hi,true)+300;
+}
+// Kde jsem a do čeho za pár minut vletím (po přímce podle TRK a GS); každý prostor ohlásí jednou.
+function aspCheck(){
+  const el=$('aspWarn');
+  if (!S.cfg.asp || !ASP.list.length || !S.pos){ el.className=''; return; }
+  const now=Date.now(), rel=ASP.list.filter(A=>ASP_ALERT.has(A.t) && aspVert(A));
+  const inside=aspAt(S.pos,rel), ahead=new Map();
+  if (S.trk!=null && (S.gs||0)>20 && S.cfg.aspLook>0){
+    const far=S.gs/60*S.cfg.aspLook, near=rel.filter(A=>!inside.includes(A));
+    for (let d=0.5; d<=far+1e-9; d+=0.5){
+      for (const A of aspAt(gDest(S.pos,S.trk,d),near)) if (!ahead.has(A.id)) ahead.set(A.id,{A,min:d/S.gs*60});
+    }
+  }
+  for (const A of inside){ const k=ASP.said.get(A.id);
+    if (!k || k.state!=='in'){ speak(`Vstup do ${aspSpoken(A)}.`); }
+    ASP.said.set(A.id,{state:'in',seen:now}); }
+  for (const {A,min} of ahead.values()){ const k=ASP.said.get(A.id);
+    if (!k){ speak(`Pozor, za ${Math.max(1,Math.round(min))} ${Math.round(min)<=1?'minutu':'minuty'} ${aspSpoken(A)}.`); beep(); }
+    ASP.said.set(A.id,{state:k&&k.state==='in'?'in':'ahead',seen:now}); }
+  for (const [id,k] of ASP.said){ if (now-k.seen>60000) ASP.said.delete(id); }  // po minutě mimo dosah lze ohlásit znovu
+  // pruh: nejbližší vstup má přednost před informací, kde jsem
+  const first=[...ahead.values()].sort((a,b)=>a.min-b.min)[0];
+  const act=A=> ASP_ACTIVATED.has(A.t)||A.act? ' · aktivitu ověř (AUP/NOTAM)' : '';
+  if (first){
+    const A=first.A, more=ahead.size>1? ` (+${ahead.size-1})` : '';
+    el.innerHTML=`Za ${Math.max(1,Math.round(first.min))} min: ${esc(aspLabel(A))}${more}<small>${esc(aspLimits(A))}${act(A)}</small>`;
+    el.className='ahead';
+  } else if (inside.length){
+    const A=inside.slice().sort((a,b)=>a.area-b.area)[0];
+    el.innerHTML=`V prostoru ${esc(aspLabel(A))}${inside.length>1?` (+${inside.length-1})`:''}<small>${esc(aspLimits(A))}${act(A)}</small>`;
+    el.className= [1,2,3].includes(A.t)? 'in alert' : 'in';
+  } else el.className='';
+}
 
 
 /* ================= názvy bodů ================= */
@@ -994,10 +1239,11 @@ $('bGo').onclick=()=>{
 /* ================= init ================= */
 window.addEventListener('resize',resize);
 { const v=$('appVer'); if(v.textContent.startsWith('__')) v.textContent='dev (lokální)'; }
-bindSettings(); chartInfo(); showOrient(false); resize(); if(S.route){ fitRoute(); } updateStartInfo(); renderLegs(); updateNav(); requestRender();
+bindSettings(); chartInfo(); aspInfo(); aspLoad(); showOrient(false); resize(); if(S.route){ fitRoute(); } updateStartInfo(); renderLegs(); updateNav(); requestRender();
 if('serviceWorker' in navigator && location.protocol==='https:'){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
 // test hook
-window.__PPL = { S, nearbyAD, renamePoint, parseGPX, setRoute, legGeom, gDist, gBrg, onFix, CHART, importMBTiles };
+window.__PPL = { S, nearbyAD, renamePoint, parseGPX, setRoute, legGeom, gDist, gBrg, onFix, CHART, importMBTiles,
+                 ASP, aspAt, aspCheck, aspIdentify, aspSpoken, fmtLim, toScreen };
 </script>
 </body>
 </html>
