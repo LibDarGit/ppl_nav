@@ -118,6 +118,32 @@ button.b.sm{height:38px;padding:0 10px;font-size:15px}
 .legtools{display:flex;gap:8px;padding:10px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
 .leg button.ed{font-size:18px;padding:0 10px}
 input[type=file]{display:none}
+/* časy letu (pojíždění, vzlet, přistání, stání) */
+#bBlk{min-width:150px}
+#bBlk.run{border-color:var(--ok);color:var(--ok)}
+.plan.blk label{flex-direction:column;align-items:flex-start;gap:2px;font-size:13px}
+/* navigační štítek na nákoleník A5: jen pro tisk */
+#print{display:none}
+@media print{
+  @page{size:A5 portrait;margin:8mm}
+  html,body{height:auto;overflow:visible;background:#fff;color:#000}
+  #app,#start,#nameDlg,#prog{display:none!important}
+  #print{display:block;color:#000;font:10pt/1.25 -apple-system,"Helvetica Neue",Arial,sans-serif}
+  #print h1{font-size:14pt;margin:0 0 1mm}
+  #print .meta{font-size:9pt;margin-bottom:2mm}
+  #print table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+  #print th,#print td{border:0.3mm solid #000;padding:1.2mm 1mm;text-align:center}
+  #print th{font-size:8pt;font-weight:600;background:#e6e6e6;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  #print td.pt{text-align:left;font-weight:700;font-size:10.5pt}
+  #print td.big{font-size:12pt;font-weight:700}
+  #print td.w{width:13mm}
+  #print tr{break-inside:avoid}
+  #print .times{margin:3mm 0}
+  #print .times td{height:7mm;font-size:11pt;font-weight:700}
+  #print .times th{width:20%}
+  #print .fill td{height:7mm;text-align:left;font-size:8pt;vertical-align:top}
+  #print .foot{font-size:7.5pt;margin-top:2mm;color:#333}
+}
 @media (max-width:900px){
   #strip{grid-template-columns:repeat(4,1fr)}
   .box.wp{grid-column:span 4}
@@ -217,6 +243,7 @@ input[type=file]{display:none}
       <div id="xte">—<small>odchylka od trati</small></div>
     </div>
     <div class="btns">
+      <button class="b" id="bBlk" title="Zapsat čas">⏱ Pojíždění</button>
       <button class="b" id="bPrev">◀ Bod</button>
       <button class="b" id="bNext">Bod ▶</button>
       <button class="b pri" id="bLegs">Trasa</button>
@@ -238,6 +265,7 @@ input[type=file]{display:none}
       iPad potřebuje GPS (verze s mobilními daty, nebo externí GPS přijímač). Během letu nech aplikaci na popředí.</div>
   </div>
 </div>
+<div id="print"></div>
 <input type="file" id="file" accept=".gpx,application/gpx+xml,application/xml,text/xml,*/*">
 <input type="file" id="chartFile">
 <div id="nameDlg"><div class="card">
@@ -297,7 +325,8 @@ const S = {
   follow: true,
   cfg: Object.assign({ map:'otm', underlay:true, du:'nm', su:'kt', orient:'trk', wd:0, wdSet:false, ws:0, dep:'', mag:true, variation:5.3, seq:0.5, cdi:2, tas:90, voice:true, night:false, sim:false, simKt:100,
                       asp:true, aspMaxFt:9500, aspLook:3, aspCountries:'CZ' }, LS.get('cfg',{})),
-  announced: {}, started: false
+  announced: {}, started: false,
+  blk: LS.get('blk', {})                 // časy letu v ms: out = začátek pojíždění, off = vzlet, on = přistání, in = konec pojíždění
 };
 const saveNav = () => { LS.set('active',S.active); LS.set('directFrom',S.directFrom); };
 
@@ -754,7 +783,8 @@ function legPlan(){
 }
 const fmtMin = m => isFinite(m)? Math.max(1,Math.round(m))+' min' : '—';
 const fmtHM  = m => { if(!isFinite(m)) return '—'; const r=Math.round(m); return Math.floor(r/60)+':'+String(r%60).padStart(2,'0'); };
-function depDate(){ const v=S.cfg.dep; if(!v) return null; const [h,m]=v.split(':').map(Number); const d=new Date(); d.setHours(h,m,0,0); return d; }
+function depDate(){ if(S.blk.off) return new Date(S.blk.off); // zapsaný vzlet má přednost před plánovaným odletem
+  const v=S.cfg.dep; if(!v) return null; const [h,m]=v.split(':').map(Number); const d=new Date(); d.setHours(h,m,0,0); return d; }
 const etaAt = min => { const d=depDate(); return d&&isFinite(min)? fmtClock(new Date(d.getTime()+Math.round(min)*60000)) : null; };
 function renderLegs(){
   const el=$('legList'); if(!S.route){ el.innerHTML='<div class="note">Není nahraná žádná trasa.</div>'; return; }
@@ -767,7 +797,10 @@ function renderLegs(){
       <label>Odlet <input id="pDep" type="time"><button class="b sm" id="pNow">teď</button></label>
     </div>
     <div class="tot sum" id="planSum"></div>
-    <div class="legtools"><button class="b" id="bSuggest">Navrhnout názvy</button><button class="b" id="bExport">Export GPX</button><button class="b" id="bCopyPlan">Kopírovat plán</button></div>
+    <div class="plan blk" id="blkHdr">${BLK_EV.map(([k,n])=>`<label>${n} <input id="bk_${k}" type="time"></label>`).join('')}
+      <button class="b sm" id="bBlkNew" style="align-self:flex-end">Nový let</button></div>
+    <div class="tot" id="blkSum"></div>
+    <div class="legtools"><button class="b" id="bSuggest">Navrhnout názvy</button><button class="b" id="bExport">Export GPX</button><button class="b" id="bCopyPlan">Kopírovat plán</button><button class="b" id="bPrint">Tisk štítku A5</button></div>
     <div id="legRows"></div>`;
   }
   // hodnoty doplň jen do polí, ve kterých uživatel právě nepíše
@@ -777,7 +810,7 @@ function renderLegs(){
   setIn('pWs', S.cfg.ws>0? Math.round(sV(S.cfg.ws)) : '');
   setIn('pDep', S.cfg.dep||'');
   document.querySelectorAll('#planHdr .uS').forEach(e=>e.textContent=sU());
-  renderPlanBody();
+  blkShow(); renderPlanBody();
 }
 function renderPlanBody(){
   const pts=S.route.pts, P=legPlan(), wind=(+S.cfg.ws||0)>0, cl=S.cfg.mag?'M':'T';
@@ -789,7 +822,7 @@ function renderPlanBody(){
     if(i>0){ const q=P[i];
       d=`<div class="d">${S.cfg.mag?'MK':'TK'} ${fmtCrs(q.tc)} · ${fD(q.L,1)} ${dU()}${wind?` · kurz ${fmtCrs(q.th)}${cl} (${q.wca>=0?'+':''}${Math.round(q.wca)}°)`:''}</div>
          <div class="d t">${wind||q.custom?`GS ${isFinite(q.gs)?Math.round(sV(q.gs)):'—'} ${sU()}${q.custom?` <span title="vlastní rychlost úseku">(TAS ${Math.round(sV(q.tas))}*)</span>`:''} · `:''}<b>${fmtMin(q.t)}</b> · Σ ${fmtHM(q.cum)}${etaAt(q.cum)?` · ETA <b>${etaAt(q.cum)}</b>`:''}</div>`;
-    } else d=`<div class="d">start${etaAt(0)?` · odlet <b>${etaAt(0)}</b>`:''}</div>`;
+    } else d=`<div class="d">start${etaAt(0)?` · ${S.blk.off?'vzlet':'odlet'} <b>${etaAt(0)}</b>`:''}</div>`;
     h+=`<div class="leg ${cls}"><div><div class="n">${esc(p.name)}</div>${d}</div>
       <div class="acts"><button class="ed" data-ed="${i}">✎</button>${i>0?`<button data-leg="${i}">Úsek</button>`:''}<button class="dto" data-dto="${i}">D→</button></div></div>`;
   });
@@ -814,6 +847,8 @@ $('legList').addEventListener('click',e=>{
   if(b.id==='pNow'){ const d=new Date(); S.cfg.dep=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); LS.set('cfg',S.cfg); $('pDep').value=S.cfg.dep; renderPlanBody(); return; }
   if(b.id==='bCopyPlan'){ const t=planText(); (navigator.clipboard? navigator.clipboard.writeText(t):Promise.reject()).then(()=>showBanner('Navigační plán zkopírován','info',2500)).catch(()=>showBanner('Kopírování se nepodařilo','bad',3000)); return; }
   if(b.id==='bExport'){ exportGPX(); return; }
+  if(b.id==='bPrint'){ printKneeboard(); return; }
+  if(b.id==='bBlkNew'){ blkNew(b); return; }
   if(b.dataset.ed){ openNameDlg(+b.dataset.ed); return; }
   if(b.dataset.leg) activateLeg(+b.dataset.leg);
   if(b.dataset.dto) directTo(+b.dataset.dto);
@@ -825,6 +860,7 @@ function onPlanInput(e){
   else if(id==='pWd'){ if(raw===''){ c.wd=0; c.wdSet=false; } else if(isFinite(v)){ c.wd=norm360(v); c.wdSet=true; } }
   else if(id==='pWs'){ c.ws=isFinite(v)&&v>0? fromS(v):0; }
   else if(id==='pDep'){ c.dep=raw||''; }
+  else if(id.startsWith('bk_')){ blkSet(id.slice(3),raw); return; }
   else return;
   LS.set('cfg',c); renderPlanBody();
   if(id==='pTas' && e.type==='change') fillUnits();
@@ -835,6 +871,72 @@ $('bLegs').onclick=()=>{ renderLegs(); $('dSet').classList.remove('open'); $('dL
 $('bSet').onclick=()=>{ $('dLegs').classList.remove('open'); $('dSet').classList.toggle('open'); };
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>b.closest('.drawer').classList.remove('open'));
 $('bPrev').onclick=()=>sequence(-1); $('bNext').onclick=()=>sequence(1);
+
+/* ================= časy letu ================= */
+const BLK_EV=[['out','Pojíždění','začátek pojíždění'],['off','Vzlet','vzlet'],['on','Přistání','přistání'],['in','Stání','konec pojíždění']];
+const hhmm = d => String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+const hhmmUTC = d => String(d.getUTCHours()).padStart(2,'0')+':'+String(d.getUTCMinutes()).padStart(2,'0');
+const blkNext = () => BLK_EV.find(([k])=>!S.blk[k]);
+// délka v minutách; časy jsou zarovnané na celé minuty, jak se píšou do zápisníku, přes půlnoc +24 h
+const blkDur = (a,b) => { if(!S.blk[a]||!S.blk[b]) return NaN; const m=(S.blk[b]-S.blk[a])/60000; return m<0? m+1440 : m; };
+function blkSave(){ LS.set('blk',S.blk); blkShow(); if($('planSum')) renderPlanBody(); }
+function blkTap(){
+  const e=blkNext();
+  if(!e){ renderLegs(); $('dSet').classList.remove('open'); $('dLegs').classList.add('open'); return; }
+  const t=Math.floor(Date.now()/60000)*60000; S.blk[e[0]]=t; blkSave();
+  showBanner(`${e[1]} ${hhmm(new Date(t))}`,'info',3000);
+}
+function blkSet(k,v){ // ruční oprava z panelu Trasa: HH:MM ke dni začátku pojíždění (jinak dnes)
+  if(!v){ delete S.blk[k]; blkSave(); return; }
+  const [h,m]=v.split(':').map(Number); if(!isFinite(h)||!isFinite(m)) return;
+  const d=new Date(S.blk.out||S.blk.off||Date.now()); d.setHours(h,m,0,0); S.blk[k]=d.getTime(); blkSave();
+}
+let blkNewArm=null;
+function blkNew(b){ // dvojí klepnutí, ať se časy nesmažou omylem
+  if(!blkNewArm){ b.textContent='Opravdu smazat časy?'; blkNewArm=setTimeout(()=>{ blkNewArm=null; b.textContent='Nový let'; },3000); return; }
+  clearTimeout(blkNewArm); blkNewArm=null; b.textContent='Nový let'; S.blk={}; blkSave();
+}
+function blkSummary(){
+  const blk=blkDur('out','in'), fl=blkDur('off','on'), utc=BLK_EV.filter(([k])=>S.blk[k]).map(([k])=>hhmmUTC(new Date(S.blk[k])));
+  return [isFinite(blk)?`blok <b>${fmtHM(blk)}</b>`:'', isFinite(fl)?`let <b>${fmtHM(fl)}</b>`:'', utc.length?`UTC ${utc.join(' / ')}`:''].filter(Boolean).join(' · ');
+}
+function blkShow(){
+  const e=blkNext(), b=$('bBlk');
+  b.textContent = e? '⏱ '+e[1] : 'Blok '+fmtHM(blkDur('out','in'));
+  b.classList.toggle('run', !!S.blk.out && !S.blk.in);
+  if(!$('blkHdr')) return;
+  for(const [k] of BLK_EV){ const i=$('bk_'+k); if(document.activeElement!==i) i.value=S.blk[k]? hhmm(new Date(S.blk[k])) : ''; }
+  $('blkSum').innerHTML = blkSummary() || 'Časy zapíšeš tlačítkem ⏱ dole, tady je můžeš opravit.';
+}
+$('bBlk').onclick=blkTap;
+
+/* ================= navigační štítek A5 ================= */
+function kneeboardHTML(){
+  const pts=S.route.pts, P=legPlan(), wind=(+S.cfg.ws||0)>0, cl=S.cfg.mag?'M':'T', ck=S.cfg.mag?'MK':'TK';
+  const dep=depDate(), t=k=>S.blk[k]? hhmm(new Date(S.blk[k])) : '';
+  const meta=[`${fD(P.total.L,1)} ${dU()}`, fmtHM(P.total.t), `TAS ${Math.round(sV(S.cfg.tas))} ${sU()}`,
+    wind? `vítr ${String(Math.round(S.cfg.wd)).padStart(3,'0')}°/${Math.round(sV(S.cfg.ws))} ${sU()}` : 'bez větru',
+    S.cfg.mag? `deklinace ${String(S.cfg.variation).replace('.',',')}°E` : 'kurzy zeměpisné',
+    dep? `${S.blk.off?'vzlet':'odlet'} ${hhmm(dep)}` : ''].filter(Boolean).join(' · ');
+  let rows=`<tr><td class="pt">${esc(pts[0].name)}</td><td></td>${wind?'<td></td>':''}<td></td><td></td><td></td><td></td><td>${dep?hhmm(dep):''}</td><td class="w"></td></tr>`;
+  for(let i=1;i<pts.length;i++){ const q=P[i];
+    rows+=`<tr><td class="pt">${esc(pts[i].name)}</td><td class="big">${fmtCrs(q.tc).replace('°','')}</td>${wind?`<td class="big">${fmtCrs(q.th).replace('°','')}</td>`:''}
+      <td>${fD(q.L,1)}</td><td>${isFinite(q.gs)?Math.round(sV(q.gs)):'—'}</td><td class="big">${isFinite(q.t)?Math.max(1,Math.round(q.t)):'—'}</td>
+      <td>${fmtHM(q.cum)}</td><td>${etaAt(q.cum)||''}</td><td class="w"></td></tr>`;
+  }
+  return `<h1>${esc(S.route.name)}</h1><div class="meta">${meta}</div>
+  <table><thead><tr><th>Bod</th><th>${ck}°</th>${wind?`<th>Kurz°${cl}</th>`:''}<th>${dU()}</th><th>GS</th><th>min</th><th>Σ</th><th>ETA</th><th>ATA</th></tr></thead>
+  <tbody>${rows}</tbody></table>
+  <table class="times"><tr>${BLK_EV.map(([,n])=>`<th>${n}</th>`).join('')}<th>Blok / let</th></tr>
+    <tr>${BLK_EV.map(([k])=>`<td>${t(k)}</td>`).join('')}<td>${isFinite(blkDur('out','in'))?fmtHM(blkDur('out','in')):''}${isFinite(blkDur('off','on'))?' / '+fmtHM(blkDur('off','on')):''}</td></tr></table>
+  <table class="fill"><tr><td>Datum</td><td>Letadlo</td><td>ATIS / QNH</td><td>RWY</td></tr><tr><td colspan="2">Palivo</td><td colspan="2">Poznámky</td></tr></table>
+  <div class="foot">Časy v místním čase. Plán z PPL Nav, kurzy a časy ověř podle mapy a aktuálního větru.</div>`;
+}
+function printKneeboard(){
+  if(!S.route) return;
+  $('print').innerHTML=kneeboardHTML();
+  try{ window.print(); }catch(e){ showBanner('Tisk se nepodařilo spustit','bad',4000); }
+}
 
 /* ================= settings ================= */
 function fillUnits(){
@@ -1240,11 +1342,11 @@ $('bGo').onclick=()=>{
 /* ================= init ================= */
 window.addEventListener('resize',resize);
 { const v=$('appVer'); if(v.textContent.startsWith('__')) v.textContent='dev (lokální)'; }
-bindSettings(); chartInfo(); aspInfo(); aspLoad(); showOrient(false); resize(); if(S.route){ fitRoute(); } updateStartInfo(); renderLegs(); updateNav(); requestRender();
+bindSettings(); blkShow(); chartInfo(); aspInfo(); aspLoad(); showOrient(false); resize(); if(S.route){ fitRoute(); } updateStartInfo(); renderLegs(); updateNav(); requestRender();
 if('serviceWorker' in navigator && location.protocol==='https:'){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
 // test hook
 window.__PPL = { S, nearbyAD, renamePoint, parseGPX, setRoute, legGeom, gDist, gBrg, onFix, CHART, importMBTiles,
-                 ASP, aspAt, aspCheck, aspIdentify, aspSpoken, fmtLim, toScreen };
+                 ASP, aspAt, aspCheck, aspIdentify, aspSpoken, fmtLim, toScreen, kneeboardHTML };
 </script>
 </body>
 </html>
