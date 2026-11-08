@@ -8,6 +8,7 @@ Je to webová aplikace (PWA). Spouští se z ikony na ploše iPadu a funguje i o
 - kurz k bodu, vzdálenost, čas k bodu a příletu (ETE/ETA), GS a odchylka od trati (CDI)
 - automatické přepínání bodů, přímý let na bod (Direct To), hlasová upozornění česky
 - navigační plán s větrem: kurz s opravou na vítr, GS, časy úseků, ETA
+- zápis časů letu (pojíždění, vzlet, přistání, stání) a tisk navigačního štítku na nákoleník A5 (viz [docs/casy-a-stitek.md](docs/casy-a-stitek.md))
 - podklad mapa ICAO 1:500 000 z vlastního souboru MBTiles (viz [docs/mapa-ICAO.md](docs/mapa-ICAO.md))
 - vzdušné prostory z openAIP s varováním před vstupem (viz [docs/vzdusne-prostory.md](docs/vzdusne-prostory.md))
 - pojmenování bodů (letiště, obce) a export trasy do GPX
