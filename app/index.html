@@ -395,30 +395,62 @@ const TILE_SRC = {
   osm: (z,x,y)=>`https://tile.openstreetmap.org/${z}/${x}/${y}.png`,
   otm: (z,x,y)=>`https://${'abc'[(x+y)%3]}.tile.opentopomap.org/${z}/${x}/${y}.png`
 };
-const tileCache=new Map();
+// Mezipaměť dlaždic (LRU). Dlaždice použitá ve snímku se přesune na konec, vyhazuje se od nejdéle nepoužité,
+// takže se nikdy nevyhodí dlaždice, která je právě vidět. Nedotažené dlaždice, které už nejsou potřeba
+// (po přiblížení / oddálení), se zruší, aby nezdržovaly stahování těch aktuálních.
+const tileCache=new Map(); let tileFrame=0, tileCap=800;
+const TILE_RETRY_MS=20000;
+function dropTile(k,t){ t.dead=true; if(!t.ok) t.img.src=''; if(t.url) URL.revokeObjectURL(t.url); tileCache.delete(k); }
 function getTile(src,z,x,y){
   const key=src+'/'+z+'/'+x+'/'+y; let t=tileCache.get(key);
-  if(t) return t;
-  const img=new Image(); t={img,ok:false,err:false,url:null}; tileCache.set(key,t);
-  img.onload=()=>{t.ok=true;requestRender();}; img.onerror=()=>{t.err=true;};
+  if(t && t.err && Date.now()-t.errAt>TILE_RETRY_MS){ dropTile(key,t); t=null; } // chyba (offline): po chvíli zkus znovu
+  if(t){ tileCache.delete(key); tileCache.set(key,t); t.used=tileFrame; return t; }
+  const img=new Image(); t={img,ok:false,err:false,url:null,used:tileFrame,dead:false}; tileCache.set(key,t);
+  img.onload=()=>{ if(t.dead) return; t.ok=true; requestRender(); };
+  img.onerror=()=>{ if(t.dead) return; t.err=true; t.errAt=Date.now(); };
   if (src==='icao'){
-    chartGet(z+'/'+x+'/'+y).then(b=>{ if(!b){t.err=true;return;} t.url=URL.createObjectURL(b); img.src=t.url; }).catch(()=>{t.err=true;});
+    chartGet(z+'/'+x+'/'+y).then(b=>{ if(t.dead) return; if(!b){t.err=true;t.errAt=Infinity;return;} t.url=URL.createObjectURL(b); img.src=t.url; })
+      .catch(()=>{ t.err=true; t.errAt=Date.now(); });
   } else img.src=TILE_SRC[src](z,x,y);
-  if(tileCache.size>700){ const k=tileCache.keys().next().value; const o=tileCache.get(k); if(o&&o.url) URL.revokeObjectURL(o.url); tileCache.delete(k); }
   return t;
+}
+const peekTile=(src,z,x,y)=>{ const t=tileCache.get(src+'/'+z+'/'+x+'/'+y); return t&&t.ok? t : null; };
+function sweepTiles(){
+  for(const [k,t] of tileCache){ if(!t.ok && !t.err && t.used<tileFrame) dropTile(k,t); }   // už nepotřebné stahování
+  for(const [k,t] of tileCache){ if(tileCache.size<=tileCap) break; if(t.used<tileFrame) dropTile(k,t); } // LRU: nejstarší první
+}
+// náhrada za ještě nenačtenou dlaždici: výřez z načtené dlaždice o 1–4 úrovně hrubší, jinak 4 jemnější dlaždice
+function drawFallback(ctx,src,z,x,y,minZ,maxZ){
+  for(let d=1; d<=4 && z-d>=minZ; d++){
+    const f=2**d, p=peekTile(src,z-d,x>>d,y>>d); if(!p) continue;
+    const s=256/f; p.used=tileFrame;
+    ctx.drawImage(p.img,(x%f)*s,(y%f)*s,s,s, 0,0,256.6,256.6); return;
+  }
+  if(z+1>maxZ) return;
+  for(let i=0;i<4;i++){ const c=peekTile(src,z+1,2*x+(i&1),2*y+(i>>1)); if(c){ c.used=tileFrame; ctx.drawImage(c.img,(i&1)*128,(i>>1)*128,128.6,128.6); } }
 }
 function drawTileLayer(ctx,a,src,minZ,maxZ){
   const tz=Math.max(minZ,Math.min(maxZ,Math.round(S.view.z))), sc=2**(S.view.z-tz);
   if (sc<0.24) return; // too far zoomed out for this layer
-  const c=proj(S.view.lat,S.view.lon,tz), rad=Math.hypot(MW,MH)/sc;
-  const n=2**tz, x0=Math.floor((c.x-rad)/256), x1=Math.floor((c.x+rad)/256),
-        y0=Math.max(0,Math.floor((c.y-rad)/256)), y1=Math.min(n-1,Math.floor((c.y+rad)/256));
+  // přesně viditelná oblast: rohy obrazovky převedené do souřadnic dlaždic (i při natočené mapě)
+  const c=proj(S.view.lat,S.view.lon,tz), r=S.view.rot*D2R, cs=Math.cos(r), sn=Math.sin(r);
+  let bx0=Infinity,bx1=-Infinity,by0=Infinity,by1=-Infinity;
+  for(const [px,py] of [[0,0],[MW,0],[0,MH],[MW,MH]]){
+    const dx=(px-a.x)/sc, dy=(py-a.y)/sc, wx=c.x+dx*cs-dy*sn, wy=c.y+dx*sn+dy*cs;
+    bx0=Math.min(bx0,wx); bx1=Math.max(bx1,wx); by0=Math.min(by0,wy); by1=Math.max(by1,wy);
+  }
+  const n=2**tz, x0=Math.floor(bx0/256), x1=Math.floor(bx1/256),
+        y0=Math.max(0,Math.floor(by0/256)), y1=Math.min(n-1,Math.floor(by1/256));
+  const count=(x1-x0+1)*(y1-y0+1);
+  if (count>600) return; // mimo rozumné měřítko vrstvy (oddálená mapa ICAO)
+  tileCap=Math.max(tileCap,count*3);
   ctx.save(); ctx.translate(a.x,a.y); ctx.rotate(-S.view.rot*D2R); ctx.scale(sc,sc); ctx.translate(-c.x,-c.y);
   for(let ty=y0;ty<=y1;ty++) for(let tx=x0;tx<=x1;tx++){
     const wx=((tx%n)+n)%n;
     if (src==='icao' && CHART.meta && !chartCovers(tz,wx,ty)) continue;
     const t=getTile(src,tz,wx,ty);
     if(t.ok) ctx.drawImage(t.img,tx*256,ty*256,256.6,256.6);
+    else { ctx.save(); ctx.translate(tx*256,ty*256); drawFallback(ctx,src,tz,wx,ty,minZ,maxZ); ctx.restore(); }
   }
   ctx.restore();
 }
@@ -452,7 +484,7 @@ function render(){
   let rotAnim=false; { const tgt=orientTarget();
     if (tgt!=null){ const d=angDiff(S.view.rot,tgt);
       if (Math.abs(d)<0.3) S.view.rot=tgt; else { S.view.rot=norm360(S.view.rot+d*0.22); rotAnim=true; } } }
-  const a=anchor();
+  const a=anchor(); tileFrame++;
   // tiles
   if (S.cfg.map==='icao'){
     if (S.cfg.underlay) drawTileLayer(ctx,a,'otm',3,17);
@@ -463,6 +495,7 @@ function render(){
     if(night){ ctx.fillStyle='rgba(5,10,25,.62)'; ctx.fillRect(0,0,MW,MH); }
     else { ctx.fillStyle='rgba(255,255,255,.12)'; ctx.fillRect(0,0,MW,MH); }
   }
+  sweepTiles();
   drawAirspaces(ctx,a);
   // breadcrumb
   if (S.hist.length>1){
@@ -763,7 +796,13 @@ mapCv.addEventListener('pointerup',e=>{
   if (t && e.type==='pointerup' && Date.now()-t.t<600){ const r=mapCv.getBoundingClientRect(); aspIdentify(fromScreen(e.clientX-r.left,e.clientY-r.top)); }
 });
 mapCv.addEventListener('pointercancel',e=>{ tap=null; up(e); });
-mapCv.addEventListener('wheel',e=>{ e.preventDefault(); zoomBy(-e.deltaY/300); },{passive:false});
+// kolečko / touchpad: bod pod kurzorem zůstane na místě (při sledování polohy zoom ke středu, letadlo zůstává na kotvě)
+function zoomAt(dz,x,y){
+  if (S.follow){ zoomBy(dz); return; }
+  const g=fromScreen(x,y); S.view.z=Math.max(5,Math.min(16,S.view.z+dz));
+  const p=toScreen(g.lat,g.lon); panBy(x-p.x,y-p.y); requestRender();
+}
+mapCv.addEventListener('wheel',e=>{ e.preventDefault(); const r=mapCv.getBoundingClientRect(); zoomAt(-e.deltaY/300,e.clientX-r.left,e.clientY-r.top); },{passive:false});
 $('bZin').onclick=()=>zoomBy(0.5); $('bZout').onclick=()=>zoomBy(-0.5);
 $('bFollow').onclick=()=>setFollow(!S.follow);
 const ORIENT={ trk:['TRK<br>UP','Mapa ve směru letu (traťový úhel z GPS)'], dtk:['DTK<br>UP','Mapa ve směru plánované trati'], north:['N<br>UP','Sever nahoře'] };
@@ -1429,7 +1468,7 @@ bindSettings(); blkShow(); chartInfo(); aspInfo(); aspLoad(); showOrient(false);
 if('serviceWorker' in navigator && location.protocol==='https:'){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
 // test hook
 window.__PPL = { S, nearbyAD, renamePoint, parseGPX, setRoute, legGeom, gDist, gBrg, onFix, CHART, importMBTiles,
-                 ASP, aspAt, aspCheck, aspIdentify, aspSpoken, fmtLim, toScreen, kneeboardHTML };
+                 ASP, aspAt, aspCheck, aspIdentify, aspSpoken, fmtLim, toScreen, fromScreen, kneeboardHTML, requestRender };
 </script>
 </body>
 </html>
