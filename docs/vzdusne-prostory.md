@@ -17,7 +17,8 @@ Datum stažení je vidět v Nastavení.
 ## Co aplikace dělá
 
 - **Mapa:** CTR/ATZ modře s výplní, TMA/CTA modře, P červeně s výplní, R/D červeně čárkovaně,
-  TRA/TSA oranžově čárkovaně, TMZ/RMZ zeleně čárkovaně. FIR, ACC/FIS sektory a airways se
+  TRA/TSA oranžově čárkovaně, TMZ/RMZ zeleně čárkovaně. Národní parky LKR1–4 (GND–1000 ft AGL)
+  vede openAIP jako „omezení nízkých přeletů“, aplikace je kreslí a hlásí jako R. FIR, ACC/FIS sektory a airways se
   nekreslí. Prostory s dolní hranicí nad nastavenou výškou (výchozí 9500 ft) se nekreslí.
 - **Klepnutí do mapy:** seznam prostorů v daném místě s výškovými hranicemi a třídou.
 - **Varování:** pokud podle traťového úhlu a GS vletíš do CTR, TMA, ATZ, TMZ, RMZ, P, R, D

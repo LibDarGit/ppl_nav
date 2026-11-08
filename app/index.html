@@ -956,10 +956,11 @@ const ASP = { list: [], meta: LS.get('aspMeta', null), said: new Map() };
 const aspTx = idbStore('pplnav-asp','data');
 const OAIP_URL = 'https://api.core.openaip.net/api/airspaces';
 const ASP_ABBR = {1:'R',2:'D',3:'P',4:'CTR',5:'TMZ',6:'RMZ',7:'TMA',8:'TRA',9:'TSA',13:'ATZ',14:'MATZ',20:'HTZ',21:'GLD',23:'TIZ',24:'TIA',
-                  25:'MTA',26:'CTA',28:'SPORT',30:'MRT',34:'LTA',36:'MCTR'};
+                  25:'MTA',26:'CTA',28:'SPORT',29:'R',30:'MRT',34:'LTA',36:'MCTR'};
 const ASP_CLASS = {0:'A',1:'B',2:'C',3:'D',4:'E',5:'F',6:'G'};
 const ASP_HIDE  = new Set([10,11,15,27,33,35]);                  // FIR, UIR, airway, ACC, FIS, UTA – jen by zahltily mapu
-const ASP_ALERT = new Set([1,2,3,4,5,6,7,8,9,13,14,26,36]);      // před vstupem do těchto se varuje
+const ASP_ALERT = new Set([1,2,3,4,5,6,7,8,9,13,14,26,29,36]);   // před vstupem do těchto se varuje
+// 29 = „omezení nízkých přeletů“: openAIP tak vede LKR1–4 (národní parky, GND–1000 ft AGL), v AIP jsou to R
 const ASP_ACTIVATED = new Set([1,2,8,9,25]);                     // R, D, TRA, TSA, MTA – aktivace podle AUP/NOTAM
 const aspCountryList = s => [...new Set(String(s||'').toUpperCase().split(/[\s,;]+/).filter(c=>/^[A-Z]{2}$/.test(c)))];
 
@@ -1057,7 +1058,7 @@ $('bAspDel').onclick=async()=>{ await aspTx('readwrite',st=>st.clear()).catch(()
 
 function aspStyle(t){
   if (t===3) return {c:'#d0021b', f:'rgba(208,2,27,.18)', w:2.5, d:[]};               // P
-  if (t===1||t===2) return {c:'#d0021b', f:'rgba(208,2,27,.07)', w:2, d:[9,5]};       // R, D
+  if (t===1||t===2||t===29) return {c:'#d0021b', f:'rgba(208,2,27,.07)', w:2, d:[9,5]}; // R, D, LKR1–4
   if (t===4||t===36||t===13||t===14) return {c:'#1f5fd6', f:'rgba(31,95,214,.10)', w:2.5, d:[]}; // CTR, ATZ
   if (t===7||t===26) return {c:'#1f5fd6', f:null, w:1.8, d:[]};                          // TMA, CTA
   if (t===8||t===9||t===25||t===30||t===16) return {c:'#c06000', f:'rgba(224,112,0,.06)', w:2, d:[11,6]}; // TRA, TSA, MTA
